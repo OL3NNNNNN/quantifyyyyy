@@ -1,4 +1,4 @@
--- [[ QUANTIFY PRO HUB - APEX V17.0 UNIQUE AUTO-BUILDER ]] --
+-- [[ QUANTIFY PRO HUB - APEX V18.0 SPAWN-AWARE EGG HUNTER ]] --
 -- Source: https://raw.githubusercontent.com/OL3NNNNNN/quantifyyyyy/refs/heads/main/Quantify.lua
 
 local RAW_URL = "https://raw.githubusercontent.com/OL3NNNNNN/quantifyyyyy/refs/heads/main/Quantify.lua"
@@ -117,8 +117,6 @@ local character = player.Character or player.CharacterAdded:Wait()
 local humanoidRootPart = character:WaitForChild("HumanoidRootPart")
 local humanoid = character:WaitForChild("Humanoid")
 local activeTargetPosition = nil
-
--- Placed Upgraders Tracker (Prevents Duplicates)
 local placedUpgradersRegistry = {}
 
 player.CharacterAdded:Connect(function(newChar)
@@ -265,7 +263,7 @@ Title.Size = UDim2.new(1, -120, 1, 0)
 Title.Position = UDim2.new(0, 50, 0, 0)
 Title.BackgroundTransparency = 1
 Title.Font = Enum.Font.GothamBold
-Title.Text = "QUANTIFY <font color='#6366F1'>PRO</font> <font color='#38BDF8'>V17</font>"
+Title.Text = "QUANTIFY <font color='#6366F1'>PRO</font> <font color='#38BDF8'>V18</font>"
 Title.RichText = true
 Title.TextColor3 = Colors.TextPrimary
 Title.TextSize = 14
@@ -327,7 +325,7 @@ CardBadge.Size = UDim2.new(0.42, 0, 1, 0)
 CardBadge.Position = UDim2.new(0.58, 0, 0, 0)
 CardBadge.BackgroundTransparency = 1
 CardBadge.Font = Enum.Font.GothamMedium
-CardBadge.Text = "Build: Unique"
+CardBadge.Text = "Status: Ready"
 CardBadge.TextColor3 = Colors.AccentGold
 CardBadge.TextSize = 10
 CardBadge.TextXAlignment = Enum.TextXAlignment.Right
@@ -690,7 +688,7 @@ end)
 createSectionHeader(MainPage, "⚡ Match Automation Core")
 createToggle(MainPage, "Auto Collect Shapes", "Only touches active shapes on conveyors", Config.AutoFarm, function(v) Config.AutoFarm = v end)
 createToggle(MainPage, "🏗️ Auto-Build Unique Vertical Stack", "Buys each unique upgrader once & stacks above you", Config.AutoBuildStack, function(v) Config.AutoBuildStack = v end)
-createToggle(MainPage, "🥚 Auto Collect Event Eggs", "Scans & grabs spawned nest eggs across map", Config.AutoCollectEggs, function(v) Config.AutoCollectEggs = v end)
+createToggle(MainPage, "🥚 Auto Collect Event Eggs", "Only grabs egg after Round 9 when hatched", Config.AutoCollectEggs, function(v) Config.AutoCollectEggs = v end)
 createToggle(MainPage, "Auto Select Best Card", "Ranks Red, Gold, Emerald & Multiplier Cards", Config.AutoPickBestCard, function(v) Config.AutoPickBestCard = v end)
 createToggle(MainPage, "Auto Retry On Loss", "Restarts match immediately on defeat", Config.AutoRetry, function(v) Config.AutoRetry = v end)
 createToggle(MainPage, "Auto Claim Daily Quests", "Claims quest rewards in background", Config.AutoClaimQuests, function(v) Config.AutoClaimQuests = v end)
@@ -819,7 +817,7 @@ createActionButton(CreditsPage, "🔄 Reload Configuration", "Reloads saved conf
 end)
 
 createSectionHeader(CreditsPage, "⭐ Release & Repository Info")
-createCreditCard("Quantify Pro Hub (Apex V17.0)", "Complete Unique Machine Stack Engine", Colors.Accent)
+createCreditCard("Quantify Pro Hub (Apex V18.0)", "Complete Spawn-Aware Egg & Match Engine", Colors.Accent)
 createCreditCard("Developer", "Created by OL3N for Quantify", Colors.AccentGold)
 createCreditCard("GitHub Script URL", "raw.githubusercontent.com/OL3NNNNNN/quantifyyyyy", Colors.AccentCyan)
 createCreditCard("Universal Compatibility", "Works on Medium, Macsploit & UNC Executors", Colors.AccentGreen)
@@ -893,10 +891,8 @@ local function autoBuildUniqueStack()
     lastBuildAttempt = now
 
     local placeRemote = getRemote("PlaceBuilding") or getRemote("Place") or getRemote("Build") or getRemote("PlaceItem")
-    local buyRemote = getRemote("BuyBuilding") or getRemote("BuyItem") or getRemote("ShopBuy")
-
-    -- Scan inventory or shop for unique upgraders
     local shopUI = playerGui:FindFirstChild("GameHUD") or playerGui:FindFirstChild("HUD")
+    
     if shopUI then
         for _, obj in ipairs(shopUI:GetDescendants()) do
             if obj:IsA("TextButton") or obj:IsA("ImageButton") then
@@ -907,16 +903,12 @@ local function autoBuildUniqueStack()
                     if lbl:IsA("TextLabel") and lbl.Visible then labelText = labelText .. " " .. lbl.Text end
                 end
 
-                -- Detect if this is an Upgrader item
                 if (itemName:find("Upgrader") or labelText:find("Upgrader") or pName:find("Upgrader")) and not placedUpgradersRegistry[itemName] then
                     placedUpgradersRegistry[itemName] = true
-                    
-                    -- Buy item once
                     triggerButton(obj)
                     
-                    -- Place in vertical stack above player
                     local targetCFrame = CFrame.new(humanoidRootPart.Position + Vector3.new(0, stackHeightOffset, 0))
-                    stackHeightOffset = stackHeightOffset + 2.0 -- increment height for clean stacking
+                    stackHeightOffset = stackHeightOffset + 2.0
                     
                     if placeRemote then
                         task.spawn(function()
@@ -936,7 +928,7 @@ local function autoBuildUniqueStack()
     end
 end
 
--- Dedicated Nest & Egg Hunter Core
+-- [[ SPAWN-AWARE EGG HUNTER ]] --
 local function getActiveEgg()
     if not Config.AutoCollectEggs then return nil end
 
@@ -945,31 +937,37 @@ local function getActiveEgg()
 
     for _, item in ipairs(map:GetChildren()) do
         if item.Name == "Nest" and item:IsA("Model") then
-            local nestModel = item:FindFirstChild("NestModel")
-            if nestModel then
-                for _, folder in ipairs(nestModel:GetChildren()) do
-                    if folder:IsA("Folder") and folder.Name:find("ExampleCF") then
-                        for _, eggNum in ipairs(folder:GetChildren()) do
-                            local eggPart = eggNum:FindFirstChild("EggShadow") or eggNum:FindFirstChildWhichIsA("BasePart")
-                            if eggPart and eggPart:IsA("BasePart") then
-                                if humanoidRootPart and typeof(firetouchinterest) == "function" then
-                                    firetouchinterest(humanoidRootPart, eggPart, 0)
-                                    firetouchinterest(humanoidRootPart, eggPart, 1)
+            -- Verify if the egg is actually ready or still waiting
+            local isWaiting = false
+            for _, descendant in ipairs(item:GetDescendants()) do
+                if descendant:IsA("TextLabel") and descendant.Visible then
+                    local text = string.lower(descendant.Text)
+                    if text:find("spawns after") or text:find("after round") then
+                        isWaiting = true
+                        break
+                    end
+                end
+            end
+
+            -- If the egg has not spawned yet, DO NOT teleport into the nest!
+            if not isWaiting then
+                local nestModel = item:FindFirstChild("NestModel")
+                if nestModel then
+                    for _, folder in ipairs(nestModel:GetChildren()) do
+                        if folder:IsA("Folder") and folder.Name:find("ExampleCF") then
+                            for _, eggNum in ipairs(folder:GetChildren()) do
+                                local eggPart = eggNum:FindFirstChild("EggShadow") or eggNum:FindFirstChildWhichIsA("BasePart")
+                                if eggPart and eggPart:IsA("BasePart") then
+                                    if humanoidRootPart and typeof(firetouchinterest) == "function" then
+                                        firetouchinterest(humanoidRootPart, eggPart, 0)
+                                        firetouchinterest(humanoidRootPart, eggPart, 1)
+                                    end
+                                    return eggPart
                                 end
-                                return eggPart
                             end
                         end
                     end
                 end
-            end
-            
-            local basePart = item:FindFirstChild("Part") or item:FindFirstChildWhichIsA("BasePart")
-            if basePart and basePart:IsA("BasePart") then
-                if humanoidRootPart and typeof(firetouchinterest) == "function" then
-                    firetouchinterest(humanoidRootPart, basePart, 0)
-                    firetouchinterest(humanoidRootPart, basePart, 1)
-                end
-                return basePart
             end
         end
     end
