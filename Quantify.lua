@@ -47,20 +47,17 @@ end
 local guiParent = getSafeGuiParent()
 local PLACE_ID = 73648930852061
 
--- Positions & Remotes
+-- Positions
 local spawnPos = Vector3.new(62.154415130615234, 25.5, 1298.9)
-local Remotes = ReplicatedStorage:WaitForChild("Remotes")
-local DifficultyRemote = Remotes:WaitForChild("Difficulty")
-local GameEndedEvent = Remotes:WaitForChild("GameEndedEvent")
-local DailyQuestEvent = Remotes:FindFirstChild("DailyQuest")
-local CompletedQuestEvent = Remotes:FindFirstChild("CompletedQuest")
-local GetDataRemote = Remotes:FindFirstChild("GetData")
 
-local shapeFolders = {
-    workspace:FindFirstChild("Parts") or Instance.new("Folder"),
-    workspace:FindFirstChild("Shapesother") or Instance.new("Folder"),
-    workspace:FindFirstChild("ChudParts") or Instance.new("Folder")
-}
+-- Safe Non-Blocking Remote Fetcher Helper
+local function getRemote(name)
+    local remotesFolder = ReplicatedStorage:FindFirstChild("Remotes")
+    if remotesFolder then
+        return remotesFolder:FindFirstChild(name)
+    end
+    return nil
+end
 
 -- Config State
 local Config = {
@@ -98,8 +95,9 @@ local function getLiveQubits()
         if qubitObj then return tostring(qubitObj.Value) end
     end
 
-    if GetDataRemote and GetDataRemote:IsA("RemoteFunction") then
-        local success, data = pcall(function() return GetDataRemote:InvokeServer() end)
+    local getData = getRemote("GetData")
+    if getData and getData:IsA("RemoteFunction") then
+        local success, data = pcall(function() return getData:InvokeServer() end)
         if success and typeof(data) == "table" and data.Qubits then
             return tostring(data.Qubits)
         end
@@ -352,7 +350,6 @@ end)
 -- ==========================
 -- TAB 2: MAIN GAME
 -- ==========================
--- Live Qubit Tracker
 local QubitFrame = Instance.new("Frame", MainPage)
 QubitFrame.Size = UDim2.new(1, 0, 0, 32)
 QubitFrame.BackgroundColor3 = Color3.fromRGB(20, 26, 42)
@@ -422,7 +419,7 @@ local function createCreditCard(title, desc)
     d.TextXAlignment = Enum.TextXAlignment.Left
 end
 
-createCreditCard("Quantify Pro Hub", "Version 2.5 Release (Universal & Autoexec)")
+createCreditCard("Quantify Pro Hub", "Version 2.6 Release (Universal & Lobby Support)")
 createCreditCard("Author / Developer", "Created by OL3N for Quantify")
 createCreditCard("GitHub Repository", "raw.githubusercontent.com/OL3NNNNNN/quantifyyyyy")
 createCreditCard("Supported Environment", "Fully compatible with Medium & Standard UNC")
@@ -447,11 +444,14 @@ local function autoVoteInsane()
     local now = tick()
     if now - lastVote >= 1.2 then
         lastVote = now
-        task.spawn(function()
-            pcall(function()
-                DifficultyRemote:InvokeServer("vote", "Insane")
+        local diffRemote = getRemote("Difficulty")
+        if diffRemote then
+            task.spawn(function()
+                pcall(function()
+                    diffRemote:InvokeServer("vote", "Insane")
+                end)
             end)
-        end)
+        end
     end
 end
 
@@ -476,11 +476,14 @@ local function autoRetry()
     if isLossVisible then
         lastRetry = now
         Stats.RetriesHandled = Stats.RetriesHandled + 1
-        task.spawn(function()
-            pcall(function()
-                GameEndedEvent:FireServer("Again")
+        local endedEvent = getRemote("GameEndedEvent")
+        if endedEvent then
+            task.spawn(function()
+                pcall(function()
+                    endedEvent:FireServer("Again")
+                end)
             end)
-        end)
+        end
     end
 end
 
@@ -492,13 +495,16 @@ local function autoClaimQuests()
     if now - lastQuestClaim < 10 then return end
     lastQuestClaim = now
 
+    local dailyEvent = getRemote("DailyQuest")
+    local completedEvent = getRemote("CompletedQuest")
+
     task.spawn(function()
-        if DailyQuestEvent then
-            pcall(function() DailyQuestEvent:FireServer("Claim") end)
-            pcall(function() DailyQuestEvent:FireServer("claim") end)
+        if dailyEvent then
+            pcall(function() dailyEvent:FireServer("Claim") end)
+            pcall(function() dailyEvent:FireServer("claim") end)
         end
-        if CompletedQuestEvent then
-            pcall(function() CompletedQuestEvent:FireServer("Claim") end)
+        if completedEvent then
+            pcall(function() completedEvent:FireServer("Claim") end)
         end
     end)
 end
@@ -507,8 +513,14 @@ end
 local function getActiveShape()
     if not Config.AutoFarm then return nil end
 
-    for _, folder in ipairs(shapeFolders) do
-        if folder and folder.Parent then
+    local folders = {
+        workspace:FindFirstChild("Parts"),
+        workspace:FindFirstChild("Shapesother"),
+        workspace:FindFirstChild("ChudParts")
+    }
+
+    for _, folder in ipairs(folders) do
+        if folder then
             for _, item in ipairs(folder:GetChildren()) do
                 if item:IsA("BasePart") then
                     return item
