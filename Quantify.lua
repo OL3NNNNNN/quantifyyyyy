@@ -907,35 +907,41 @@ local function findConveyorBasePosition()
     return Vector3.new(0, 5, 0)
 end
 
--- Helper: Ensure Inventory UI Is Open (Deep Scanning & Force-Visibility)
-local function ensureInventoryIsOpen()
-    -- 1. Direct Side/HUD Frame Unhide
-    local inventoryFrames = {
-        playerGui:FindFirstChild("HUD") and playerGui.HUD:FindFirstChild("Inventory"),
-        playerGui:FindFirstChild("GameHUD") and playerGui.GameHUD:FindFirstChild("Inventory"),
-        playerGui:FindFirstChild("Inventory"),
-        playerGui:FindFirstChild("Side") and playerGui.Side:FindFirstChild("Inventory"),
-        playerGui:FindFirstChild("BuildingShop"),
-    }
-
-    for _, frame in ipairs(inventoryFrames) do
-        if frame and frame:IsA("GuiObject") then
-            frame.Visible = true
+-- Helper: Check if Inventory / Shop is open
+local function isInventoryOpen()
+    for _, gui in ipairs(playerGui:GetDescendants()) do
+        if gui:IsA("GuiObject") and gui.Visible then
+            local n = gui.Name:lower()
+            if (n:find("inventory") or n:find("buildingshop") or n:find("machineshop")) and not n:find("button") and not n:find("icon") and gui.AbsoluteSize.Y > 80 then
+                return true
+            end
         end
     end
+    return false
+end
 
-    -- 2. Click sidebar and screen [C] buttons
+-- Helper: Ensure Inventory UI Is Open (Strict Non-Spam Debounce)
+local lastInventoryToggle = 0
+local function ensureInventoryIsOpen()
+    if isInventoryOpen() then return true end
+
+    local now = tick()
+    if now - lastInventoryToggle < 2.5 then return false end
+    lastInventoryToggle = now
+
+    -- Method 1: Click the specific [C] Inventory button
     for _, btn in ipairs(playerGui:GetDescendants()) do
         if (btn:IsA("TextButton") or btn:IsA("ImageButton")) and btn.Visible then
             local t = btn:IsA("TextButton") and btn.Text:lower() or ""
             local n = btn.Name:lower()
-            if (t:find("inventory") or n:find("inventory") or t:find("[c]")) and not n:find("close") then
+            if (t:find("[c]") and t:find("inventory")) or (n == "inventorybutton" or n == "inventory") then
                 triggerButton(btn)
+                return true
             end
         end
     end
 
-    -- 3. Virtual Input Keycode C
+    -- Method 2: Single keypress fallback
     if VirtualInputManager then
         pcall(function()
             VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.C, false, game)
@@ -943,6 +949,7 @@ local function ensureInventoryIsOpen()
             VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.C, false, game)
         end)
     end
+    return true
 end
 
 -- [[ PERFECT VERTICAL CONVEYOR STACK BUILDER ]] --
