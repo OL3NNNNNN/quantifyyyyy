@@ -1,4 +1,4 @@
--- [[ QUANTIFY PRO HUB - APEX V24.0 ULTRA-RELIABLE SHAPE COLLECTOR ]] --
+-- [[ QUANTIFY PRO HUB - APEX V25.0 AUTO-INVENTORY & FIXED SPOT BUILDER ]] --
 -- Source: https://raw.githubusercontent.com/OL3NNNNNN/quantifyyyyy/refs/heads/main/Quantify.lua
 
 local RAW_URL = "https://raw.githubusercontent.com/OL3NNNNNN/quantifyyyyy/refs/heads/main/Quantify.lua"
@@ -60,8 +60,8 @@ local Config = {
     AutoRetry = true,
     AutoClaimQuests = true,
     
-    -- Auto-Builder Feature (Safe Offset Mode)
-    AutoBuildStack = false,
+    -- Auto-Builder Feature
+    AutoBuildStack = true,
     
     -- Movement & Utilities
     SpeedBoost = false,
@@ -117,6 +117,7 @@ local humanoidRootPart = character:WaitForChild("HumanoidRootPart")
 local humanoid = character:WaitForChild("Humanoid")
 local activeTargetPosition = nil
 local placedUpgradersRegistry = {}
+local fixedBuildOrigin = nil
 
 player.CharacterAdded:Connect(function(newChar)
     character = newChar
@@ -124,6 +125,7 @@ player.CharacterAdded:Connect(function(newChar)
     humanoid = newChar:WaitForChild("Humanoid")
     activeTargetPosition = nil
     placedUpgradersRegistry = {}
+    fixedBuildOrigin = nil
     
     if Config.SpeedBoost and humanoid then
         humanoid.WalkSpeed = Config.SpeedValue
@@ -262,7 +264,7 @@ Title.Size = UDim2.new(1, -120, 1, 0)
 Title.Position = UDim2.new(0, 50, 0, 0)
 Title.BackgroundTransparency = 1
 Title.Font = Enum.Font.GothamBold
-Title.Text = "QUANTIFY <font color='#6366F1'>PRO</font> <font color='#38BDF8'>V24</font>"
+Title.Text = "QUANTIFY <font color='#6366F1'>PRO</font> <font color='#38BDF8'>V25</font>"
 Title.RichText = true
 Title.TextColor3 = Colors.TextPrimary
 Title.TextSize = 14
@@ -324,7 +326,7 @@ CardBadge.Size = UDim2.new(0.42, 0, 1, 0)
 CardBadge.Position = UDim2.new(0.58, 0, 0, 0)
 CardBadge.BackgroundTransparency = 1
 CardBadge.Font = Enum.Font.GothamMedium
-CardBadge.Text = "Status: Active"
+CardBadge.Text = "Auto-Build: ON"
 CardBadge.TextColor3 = Colors.AccentGold
 CardBadge.TextSize = 10
 CardBadge.TextXAlignment = Enum.TextXAlignment.Right
@@ -686,7 +688,7 @@ end)
 -- ===================================
 createSectionHeader(MainPage, "⚡ Match Automation Core")
 createToggle(MainPage, "Auto Collect Shapes", "Instantly touches and collects active shapes", Config.AutoFarm, function(v) Config.AutoFarm = v end)
-createToggle(MainPage, "🏗️ Auto-Build Machines (Cheapest First)", "Buys cheapest droppers & upgraders and places safely", Config.AutoBuildStack, function(v) Config.AutoBuildStack = v end)
+createToggle(MainPage, "🏗️ Auto-Open Shop & Build Machines", "Auto opens inventory/shop & places machines at your base spot", Config.AutoBuildStack, function(v) Config.AutoBuildStack = v end)
 createToggle(MainPage, "🥚 Auto Collect Event Eggs", "Background remote claim & proximity collection", Config.AutoCollectEggs, function(v) Config.AutoCollectEggs = v end)
 createToggle(MainPage, "Auto Select Best Card", "Ranks Red, Gold, Emerald & Multiplier Cards", Config.AutoPickBestCard, function(v) Config.AutoPickBestCard = v end)
 createToggle(MainPage, "Auto Retry On Loss", "Restarts match immediately on defeat", Config.AutoRetry, function(v) Config.AutoRetry = v end)
@@ -816,7 +818,7 @@ createActionButton(CreditsPage, "🔄 Reload Configuration", "Reloads saved conf
 end)
 
 createSectionHeader(CreditsPage, "⭐ Release & Repository Info")
-createCreditCard("Quantify Pro Hub (Apex V24.0)", "Complete Shape Harvester Suite", Colors.Accent)
+createCreditCard("Quantify Pro Hub (Apex V25.0)", "Fixed Base Spot & Auto Inventory Engine", Colors.Accent)
 createCreditCard("Developer", "Created by OL3N for Quantify", Colors.AccentGold)
 createCreditCard("GitHub Script URL", "raw.githubusercontent.com/OL3NNNNNN/quantifyyyyy", Colors.AccentCyan)
 createCreditCard("Universal Compatibility", "Works on Medium, Macsploit & UNC Executors", Colors.AccentGreen)
@@ -892,19 +894,41 @@ local function isVotingPhaseActive()
     return false
 end
 
--- [[ CHEAPEST-FIRST AUTO-BUILDER & SAFE OFFSET PLACER ]] --
+-- [[ AUTO-INVENTORY & FIXED BASE SPOT BUILDER ]] --
 local lastBuildAttempt = 0
-local buildXOffset = 4.0
+local buildItemCount = 0
 
-local function autoBuildCheapestFirst()
+local function autoOpenShopAndBuild()
     if not Config.AutoBuildStack or not humanoidRootPart or isVotingPhaseActive() then return end
     local now = tick()
-    if now - lastBuildAttempt < 2.0 then return end
+    if now - lastBuildAttempt < 1.5 then return end
     lastBuildAttempt = now
+
+    -- Set the fixed base build origin
+    if not fixedBuildOrigin then
+        fixedBuildOrigin = humanoidRootPart.Position + Vector3.new(4, 0, 0)
+    end
+
+    -- Auto-open Inventory if closed
+    local invBtn = playerGui:FindFirstChild("Side") and playerGui.Side:FindFirstChild("Left") and playerGui.Side.Left:FindFirstChild("Inventory")
+    if invBtn then
+        local btn = invBtn:FindFirstChildWhichIsA("GuiButton")
+        if btn then triggerButton(btn) end
+    else
+        for _, gui in ipairs(playerGui:GetDescendants()) do
+            if gui:IsA("TextButton") and gui.Visible then
+                local t = string.lower(gui.Text)
+                if t:find("inventory") or t:find("building shop") then
+                    triggerButton(gui)
+                end
+            end
+        end
+    end
 
     local placeRemote = getRemote("PlaceBuilding") or getRemote("Place") or getRemote("Build") or getRemote("PlaceItem")
     local candidates = {}
 
+    -- Scan for machines in UI
     for _, gui in ipairs(playerGui:GetDescendants()) do
         if (gui:IsA("TextButton") or gui:IsA("ImageButton")) and gui.Visible then
             local itemName = gui.Name
@@ -946,16 +970,17 @@ local function autoBuildCheapestFirst()
         placedUpgradersRegistry[chosen.Name] = true
         triggerButton(chosen.Button)
 
-        local safeTargetCFrame = CFrame.new(humanoidRootPart.Position + Vector3.new(buildXOffset, 0, 0))
-        buildXOffset = buildXOffset + 3.0
+        -- Fixed place location beside your base origin (not following mouse cursor)
+        local spotCFrame = CFrame.new(fixedBuildOrigin + Vector3.new(buildItemCount * 3.5, 0, 0))
+        buildItemCount = buildItemCount + 1
 
         if placeRemote then
             task.spawn(function()
                 pcall(function()
                     if placeRemote:IsA("RemoteFunction") then
-                        placeRemote:InvokeServer(chosen.Name, safeTargetCFrame)
+                        placeRemote:InvokeServer(chosen.Name, spotCFrame)
                     else
-                        placeRemote:FireServer(chosen.Name, safeTargetCFrame)
+                        placeRemote:FireServer(chosen.Name, spotCFrame)
                     end
                 end)
             end)
@@ -1175,7 +1200,8 @@ local function autoRetry()
         lastRetry = now
         Stats.RetriesHandled = Stats.RetriesHandled + 1
         placedUpgradersRegistry = {}
-        buildXOffset = 4.0
+        fixedBuildOrigin = nil
+        buildItemCount = 0
         local endedEvent = getRemote("GameEndedEvent")
         if endedEvent then
             task.spawn(function()
@@ -1209,7 +1235,7 @@ local function autoClaimQuests()
     end)
 end
 
--- 5. Shape Collector Target Finder (Universal Conveyor & Drop Harvester)
+-- 5. Shape Collector Target Finder (Universal Harvester)
 local function getActiveShape()
     if not Config.AutoFarm then return nil end
 
@@ -1233,7 +1259,6 @@ local function getActiveShape()
         end
     end
 
-    -- Fallback: Scan root workspace parts with shape properties
     for _, item in ipairs(workspace:GetChildren()) do
         if item:IsA("BasePart") and item.Transparency < 0.95 and not item.Anchored and item.Name ~= "Terrain" then
             return item
@@ -1253,7 +1278,6 @@ task.spawn(function()
             if shape then
                 newTarget = shape.Position + Vector3.new(0, 0.4, 0)
                 
-                -- Instant Touch Interest Simulation
                 if humanoidRootPart and typeof(firetouchinterest) == "function" then
                     firetouchinterest(humanoidRootPart, shape, 0)
                     firetouchinterest(humanoidRootPart, shape, 1)
@@ -1267,7 +1291,7 @@ task.spawn(function()
         autoPickBestCard()
         autoRetry()
         autoClaimQuests()
-        autoBuildCheapestFirst()
+        autoOpenShopAndBuild()
     end
 end)
 
