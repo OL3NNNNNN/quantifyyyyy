@@ -1,4 +1,4 @@
--- [[ QUANTIFY PRO HUB - APEX V9.5 WITH CONFIG PERSISTENCE ]] --
+-- [[ QUANTIFY PRO HUB - APEX V10.0 ULTRA-FAST BOX BURST EDITION ]] --
 -- Source: https://raw.githubusercontent.com/OL3NNNNNN/quantifyyyyy/refs/heads/main/Quantify.lua
 
 local RAW_URL = "https://raw.githubusercontent.com/OL3NNNNNN/quantifyyyyy/refs/heads/main/Quantify.lua"
@@ -76,16 +76,11 @@ local Config = {
 
 local function saveConfigToFile()
     if typeof(writefile) == "function" then
-        local success, err = pcall(function()
+        pcall(function()
             local json = HttpService:JSONEncode(Config)
             writefile(CONFIG_FILE, json)
         end)
-        if success then
-            print("[Config] Configuration saved to " .. CONFIG_FILE)
-            return true
-        end
     end
-    return false
 end
 
 local function loadConfigFromFile()
@@ -98,16 +93,12 @@ local function loadConfigFromFile()
                     for k, v in pairs(decoded) do
                         Config[k] = v
                     end
-                    print("[Config] Configuration restored successfully from " .. CONFIG_FILE)
-                    return true
                 end
             end
         end
     end
-    return false
 end
 
--- Auto-load saved settings on init
 loadConfigFromFile()
 
 local Stats = {
@@ -262,7 +253,7 @@ Title.Size = UDim2.new(1, -120, 1, 0)
 Title.Position = UDim2.new(0, 50, 0, 0)
 Title.BackgroundTransparency = 1
 Title.Font = Enum.Font.GothamBold
-Title.Text = "QUANTIFY <font color='#6366F1'>PRO</font> <font color='#38BDF8'>V9.5</font>"
+Title.Text = "QUANTIFY <font color='#6366F1'>PRO</font> <font color='#38BDF8'>V10</font>"
 Title.RichText = true
 Title.TextColor3 = Colors.TextPrimary
 Title.TextSize = 14
@@ -569,9 +560,9 @@ local function createInputRow(parent, labelText, defaultValue, callback)
 end
 
 -- ===================================
--- TAB 1: LOBBY SUITE & BOX OPENER
+-- TAB 1: ULTRA-FAST LOOTBOX ENGINE
 -- ===================================
-local function buySpecificBox(boxName)
+local function buySpecificBoxInstant(boxName)
     local currentQubits = getLiveQubitNumber()
     if currentQubits > 0 and currentQubits <= Config.BoxStopThreshold then
         Config.AutoOpenBoxMode = "None"
@@ -594,6 +585,24 @@ local function buySpecificBox(boxName)
     end
     return false
 end
+
+-- Ultra-Fast Multi-Threaded Burst Loop
+task.spawn(function()
+    while true do
+        if Config.AutoOpenBoxMode ~= "None" then
+            local currentQubits = getLiveQubitNumber()
+            if currentQubits > 0 and currentQubits <= Config.BoxStopThreshold then
+                Config.AutoOpenBoxMode = "None"
+                task.wait(0.5)
+            else
+                buySpecificBoxInstant(Config.AutoOpenBoxMode)
+                task.wait(0.02) -- Maximum burst speed
+            end
+        else
+            task.wait(0.1)
+        end
+    end
+end)
 
 local function clickSidebarButton(sideName, buttonName)
     local side = playerGui:FindFirstChild("Side")
@@ -627,14 +636,14 @@ local function teleportTo(pos)
     end
 end
 
-createSectionHeader(LobbyPage, "📦 Auto & Manual Box Openers")
-createActionButton(LobbyPage, "📦 Buy 1x Classic Box (100 Q)", "Opens a Classic Box instantly via Remote", Color3.fromRGB(30, 45, 75), function() buySpecificBox("Classic Box") end)
-createActionButton(LobbyPage, "💎 Buy 1x Rare Box (500 Q)", "Opens a Rare Box instantly via Remote", Color3.fromRGB(30, 65, 80), function() buySpecificBox("Rare Box") end)
-createActionButton(LobbyPage, "👑 Buy 1x Diamond Box (2,500 Q)", "Opens a Diamond Box instantly via Remote", Color3.fromRGB(75, 40, 85), function() buySpecificBox("Diamond Box") end)
+createSectionHeader(LobbyPage, "🚀 Ultra-Fast Lootbox Openers")
+createActionButton(LobbyPage, "📦 Buy 1x Classic Box (100 Q)", "Instant direct remote invocation", Color3.fromRGB(30, 45, 75), function() buySpecificBoxInstant("Classic Box") end)
+createActionButton(LobbyPage, "💎 Buy 1x Rare Box (500 Q)", "Instant direct remote invocation", Color3.fromRGB(30, 65, 80), function() buySpecificBoxInstant("Rare Box") end)
+createActionButton(LobbyPage, "👑 Buy 1x Diamond Box (2,500 Q)", "Instant direct remote invocation", Color3.fromRGB(75, 40, 85), function() buySpecificBoxInstant("Diamond Box") end)
 
-createToggle(LobbyPage, "🔄 Auto-Buy Classic Boxes", "Loops purchases until reserve limit is reached", (Config.AutoOpenBoxMode == "Classic Box"), function(v) Config.AutoOpenBoxMode = v and "Classic Box" or "None" end)
-createToggle(LobbyPage, "🔄 Auto-Buy Rare Boxes", "Loops purchases until reserve limit is reached", (Config.AutoOpenBoxMode == "Rare Box"), function(v) Config.AutoOpenBoxMode = v and "Rare Box" or "None" end)
-createToggle(LobbyPage, "🔄 Auto-Buy Diamond Boxes", "Loops purchases until reserve limit is reached", (Config.AutoOpenBoxMode == "Diamond Box"), function(v) Config.AutoOpenBoxMode = v and "Diamond Box" or "None" end)
+createToggle(LobbyPage, "⚡ Max-Speed Auto-Buy Classic", "Rapid zero-delay burst purchases", (Config.AutoOpenBoxMode == "Classic Box"), function(v) Config.AutoOpenBoxMode = v and "Classic Box" or "None" end)
+createToggle(LobbyPage, "⚡ Max-Speed Auto-Buy Rare", "Rapid zero-delay burst purchases", (Config.AutoOpenBoxMode == "Rare Box"), function(v) Config.AutoOpenBoxMode = v and "Rare Box" or "None" end)
+createToggle(LobbyPage, "⚡ Max-Speed Auto-Buy Diamond", "Rapid zero-delay burst purchases", (Config.AutoOpenBoxMode == "Diamond Box"), function(v) Config.AutoOpenBoxMode = v and "Diamond Box" or "None" end)
 
 createInputRow(LobbyPage, "🛑 Stop Buying Balance Limit:", Config.BoxStopThreshold, function(val) Config.BoxStopThreshold = val end)
 
@@ -795,7 +804,7 @@ createActionButton(CreditsPage, "🔄 Reload Configuration", "Reloads saved conf
 end)
 
 createSectionHeader(CreditsPage, "⭐ Release & Repository Info")
-createCreditCard("Quantify Pro Hub (Apex V9.5)", "Complete Universal Match, Difficulty & Config Suite", Colors.Accent)
+createCreditCard("Quantify Pro Hub (Apex V10.0)", "Complete Universal Match, Difficulty & Config Suite", Colors.Accent)
 createCreditCard("Developer", "Created by OL3N for Quantify", Colors.AccentGold)
 createCreditCard("GitHub Script URL", "raw.githubusercontent.com/OL3NNNNNN/quantifyyyyy", Colors.AccentCyan)
 createCreditCard("Universal Compatibility", "Works on Medium, Macsploit & UNC Executors", Colors.AccentGreen)
@@ -1103,18 +1112,7 @@ local function autoClaimQuests()
     end)
 end
 
--- 5. Auto Box Roll Execution
-local lastAutoBox = 0
-local function autoRollSelectedBoxes()
-    if Config.AutoOpenBoxMode == "None" then return end
-    local now = tick()
-    if now - lastAutoBox < 0.6 then return end
-    lastAutoBox = now
-
-    buySpecificBox(Config.AutoOpenBoxMode)
-end
-
--- 6. Shape Collector Target Finder
+-- 5. Shape Collector Target Finder
 local function getActiveShape()
     if not Config.AutoFarm then return nil end
 
@@ -1151,7 +1149,7 @@ local function getActiveShape()
     return nil
 end
 
--- 7. Main Automation Loop
+-- 6. Main Automation Loop
 task.spawn(function()
     while task.wait(0.05) do
         if Config.AutoCollectEggs then
@@ -1173,11 +1171,10 @@ task.spawn(function()
         autoPickBestCard()
         autoRetry()
         autoClaimQuests()
-        autoRollSelectedBoxes()
     end
 end)
 
--- 8. Live Qubit Monitor Loop
+-- 7. Live Qubit Monitor Loop
 task.spawn(function()
     while task.wait(1.5) do
         local q = getLiveQubitNumber()
@@ -1185,7 +1182,7 @@ task.spawn(function()
     end
 end)
 
--- 9. Jitter-Free Physics Lock (Heartbeat Sync)
+-- 8. Jitter-Free Physics Lock (Heartbeat Sync)
 RunService.Heartbeat:Connect(function()
     if not (Config.AutoFarm or Config.AutoCollectEggs) or game.PlaceId ~= PLACE_ID then return end
 
