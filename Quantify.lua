@@ -1,4 +1,4 @@
--- [[ QUANTIFY PRO HUB - APEX V15.0 COLOR & GEM CARD AI ]] --
+-- [[ QUANTIFY PRO HUB - APEX V17.0 UNIQUE AUTO-BUILDER ]] --
 -- Source: https://raw.githubusercontent.com/OL3NNNNNN/quantifyyyyy/refs/heads/main/Quantify.lua
 
 local RAW_URL = "https://raw.githubusercontent.com/OL3NNNNNN/quantifyyyyy/refs/heads/main/Quantify.lua"
@@ -61,6 +61,10 @@ local Config = {
     AutoRetry = true,
     AutoClaimQuests = true,
     
+    -- Auto-Builder Feature
+    AutoBuildStack = false,
+    
+    -- Movement & Utilities
     SpeedBoost = false,
     SpeedValue = 45,
     InfiniteJump = false,
@@ -114,11 +118,15 @@ local humanoidRootPart = character:WaitForChild("HumanoidRootPart")
 local humanoid = character:WaitForChild("Humanoid")
 local activeTargetPosition = nil
 
+-- Placed Upgraders Tracker (Prevents Duplicates)
+local placedUpgradersRegistry = {}
+
 player.CharacterAdded:Connect(function(newChar)
     character = newChar
     humanoidRootPart = newChar:WaitForChild("HumanoidRootPart")
     humanoid = newChar:WaitForChild("Humanoid")
     activeTargetPosition = nil
+    placedUpgradersRegistry = {}
     
     if Config.SpeedBoost and humanoid then
         humanoid.WalkSpeed = Config.SpeedValue
@@ -257,7 +265,7 @@ Title.Size = UDim2.new(1, -120, 1, 0)
 Title.Position = UDim2.new(0, 50, 0, 0)
 Title.BackgroundTransparency = 1
 Title.Font = Enum.Font.GothamBold
-Title.Text = "QUANTIFY <font color='#6366F1'>PRO</font> <font color='#38BDF8'>V15</font>"
+Title.Text = "QUANTIFY <font color='#6366F1'>PRO</font> <font color='#38BDF8'>V17</font>"
 Title.RichText = true
 Title.TextColor3 = Colors.TextPrimary
 Title.TextSize = 14
@@ -319,7 +327,7 @@ CardBadge.Size = UDim2.new(0.42, 0, 1, 0)
 CardBadge.Position = UDim2.new(0.58, 0, 0, 0)
 CardBadge.BackgroundTransparency = 1
 CardBadge.Font = Enum.Font.GothamMedium
-CardBadge.Text = "Card: Ready"
+CardBadge.Text = "Build: Unique"
 CardBadge.TextColor3 = Colors.AccentGold
 CardBadge.TextSize = 10
 CardBadge.TextXAlignment = Enum.TextXAlignment.Right
@@ -677,10 +685,11 @@ createActionButton(LobbyPage, "📜 Open Quests Menu", "Toggle Daily & Completed
 end)
 
 -- ===================================
--- TAB 2: MATCH AI, DIFFICULTY & MOVEMENT
+-- TAB 2: MATCH AI, DIFFICULTY & UNIQUE AUTO-BUILDER
 -- ===================================
 createSectionHeader(MainPage, "⚡ Match Automation Core")
 createToggle(MainPage, "Auto Collect Shapes", "Only touches active shapes on conveyors", Config.AutoFarm, function(v) Config.AutoFarm = v end)
+createToggle(MainPage, "🏗️ Auto-Build Unique Vertical Stack", "Buys each unique upgrader once & stacks above you", Config.AutoBuildStack, function(v) Config.AutoBuildStack = v end)
 createToggle(MainPage, "🥚 Auto Collect Event Eggs", "Scans & grabs spawned nest eggs across map", Config.AutoCollectEggs, function(v) Config.AutoCollectEggs = v end)
 createToggle(MainPage, "Auto Select Best Card", "Ranks Red, Gold, Emerald & Multiplier Cards", Config.AutoPickBestCard, function(v) Config.AutoPickBestCard = v end)
 createToggle(MainPage, "Auto Retry On Loss", "Restarts match immediately on defeat", Config.AutoRetry, function(v) Config.AutoRetry = v end)
@@ -810,7 +819,7 @@ createActionButton(CreditsPage, "🔄 Reload Configuration", "Reloads saved conf
 end)
 
 createSectionHeader(CreditsPage, "⭐ Release & Repository Info")
-createCreditCard("Quantify Pro Hub (Apex V15.0)", "Complete Color & Gem Evaluator Suite", Colors.Accent)
+createCreditCard("Quantify Pro Hub (Apex V17.0)", "Complete Unique Machine Stack Engine", Colors.Accent)
 createCreditCard("Developer", "Created by OL3N for Quantify", Colors.AccentGold)
 createCreditCard("GitHub Script URL", "raw.githubusercontent.com/OL3NNNNNN/quantifyyyyy", Colors.AccentCyan)
 createCreditCard("Universal Compatibility", "Works on Medium, Macsploit & UNC Executors", Colors.AccentGreen)
@@ -872,6 +881,60 @@ task.spawn(function()
         end
     end
 end)
+
+-- [[ UNIQUE COMPACT STACK BUILDER ENGINE ]] --
+local lastBuildAttempt = 0
+local stackHeightOffset = 3.0
+
+local function autoBuildUniqueStack()
+    if not Config.AutoBuildStack or not humanoidRootPart then return end
+    local now = tick()
+    if now - lastBuildAttempt < 2.0 then return end
+    lastBuildAttempt = now
+
+    local placeRemote = getRemote("PlaceBuilding") or getRemote("Place") or getRemote("Build") or getRemote("PlaceItem")
+    local buyRemote = getRemote("BuyBuilding") or getRemote("BuyItem") or getRemote("ShopBuy")
+
+    -- Scan inventory or shop for unique upgraders
+    local shopUI = playerGui:FindFirstChild("GameHUD") or playerGui:FindFirstChild("HUD")
+    if shopUI then
+        for _, obj in ipairs(shopUI:GetDescendants()) do
+            if obj:IsA("TextButton") or obj:IsA("ImageButton") then
+                local itemName = obj.Name
+                local pName = obj.Parent and obj.Parent.Name or ""
+                local labelText = ""
+                for _, lbl in ipairs(obj:GetDescendants()) do
+                    if lbl:IsA("TextLabel") and lbl.Visible then labelText = labelText .. " " .. lbl.Text end
+                end
+
+                -- Detect if this is an Upgrader item
+                if (itemName:find("Upgrader") or labelText:find("Upgrader") or pName:find("Upgrader")) and not placedUpgradersRegistry[itemName] then
+                    placedUpgradersRegistry[itemName] = true
+                    
+                    -- Buy item once
+                    triggerButton(obj)
+                    
+                    -- Place in vertical stack above player
+                    local targetCFrame = CFrame.new(humanoidRootPart.Position + Vector3.new(0, stackHeightOffset, 0))
+                    stackHeightOffset = stackHeightOffset + 2.0 -- increment height for clean stacking
+                    
+                    if placeRemote then
+                        task.spawn(function()
+                            pcall(function()
+                                if placeRemote:IsA("RemoteFunction") then
+                                    placeRemote:InvokeServer(itemName, targetCFrame)
+                                else
+                                    placeRemote:FireServer(itemName, targetCFrame)
+                                end
+                            end)
+                        end)
+                    end
+                    break
+                end
+            end
+        end
+    end
+end
 
 -- Dedicated Nest & Egg Hunter Core
 local function getActiveEgg()
@@ -940,23 +1003,18 @@ local function rateCard(cardObj)
     local displayName = cardObj.Name
     local score = 10
 
-    -- Extract Visual Border/Background Colors
     for _, elem in ipairs(cardObj:GetDescendants()) do
         if elem:IsA("GuiObject") and elem.Visible then
             local c = elem.BackgroundColor3
             local stroke = elem:FindFirstChildWhichIsA("UIStroke")
             if stroke then c = stroke.Color end
             
-            -- Red / Crimson Card (God/Mythic Tier)
             if (c.R > 0.7 and c.G < 0.3 and c.B < 0.3) or (c.R > 0.8 and c.G < 0.4) then
                 score = score + 1000
-            -- Gold / Amber Card (Legendary Tier)
             elseif (c.R > 0.75 and c.G > 0.6 and c.B < 0.3) then
                 score = score + 850
-            -- Emerald / Green Card (Gem Tier)
             elseif (c.G > 0.7 and c.R < 0.4 and c.B < 0.5) then
                 score = score + 750
-            -- Purple / Void Card
             elseif (c.R > 0.5 and c.B > 0.6 and c.G < 0.4) then
                 score = score + 700
             end
@@ -970,7 +1028,6 @@ local function rateCard(cardObj)
         end
     end
 
-    -- Tier 0: Gemstones & Mythics
     if fullText:find("emerald") or cardName:find("emerald") then score = score + 950 end
     if fullText:find("ruby") or cardName:find("ruby") then score = score + 950 end
     if fullText:find("sapphire") or cardName:find("sapphire") then score = score + 900 end
@@ -978,7 +1035,6 @@ local function rateCard(cardObj)
     if fullText:find("diamond") or cardName:find("diamond") then score = score + 850 end
     if fullText:find("prismatic") or fullText:find("rainbow") then score = score + 850 end
 
-    -- Tier S+: Direct Value & Multiplier Boosts
     if fullText:find("time sacrifice") or cardName:find("timesacrifice") then score = score + 650 end
     if fullText:find("stack overflow") or cardName:find("stackoverflow") then score = score + 600 end
     if fullText:find("worthy hand") or cardName:find("worthyhand") then score = score + 550 end
@@ -989,7 +1045,6 @@ local function rateCard(cardObj)
     if fullText:find("shiny") or cardName:find("shiny") then score = score + 430 end
     if fullText:find("singularity") or fullText:find("void") or fullText:find("quantum") then score = score + 420 end
 
-    -- Tier S: Multipliers parsed from string (e.g. "x3", "x2.5", "+100%")
     local mult = fullText:match("x(%d+%.?%d*)") or fullText:match("(%d+%.?%d*)x")
     if mult and tonumber(mult) then
         score = score + (tonumber(mult) * 120)
@@ -999,12 +1054,10 @@ local function rateCard(cardObj)
         score = score + (tonumber(pct) * 2)
     end
 
-    -- Tier A: Speed & Utility
     if fullText:find("overclock") or fullText:find("turbo") then score = score + 250 end
     if fullText:find("speedy") or fullText:find("conveyor") then score = score + 220 end
     if fullText:find("rush hour") or fullText:find("faster") then score = score + 200 end
 
-    -- Tier B: Shapes
     if fullText:find("hexagon") or cardName:find("hexagon") then score = score + 120 end
     if fullText:find("circle") or cardName:find("circle") then score = score + 100 end
     if fullText:find("square") or cardName:find("square") then score = score + 80 end
@@ -1067,7 +1120,7 @@ local function autoVoteDifficulty()
         if diffRemote then
             task.spawn(function()
                 pcall(function()
-                    diffRemote:InvokeServer("vote", Config.SelectedDifficulty)
+                    diffRemote:InvokeServer(Config.SelectedDifficulty)
                 end)
             end)
         end
@@ -1095,6 +1148,8 @@ local function autoRetry()
     if isLossVisible then
         lastRetry = now
         Stats.RetriesHandled = Stats.RetriesHandled + 1
+        placedUpgradersRegistry = {}
+        stackHeightOffset = 3.0
         local endedEvent = getRemote("GameEndedEvent")
         if endedEvent then
             task.spawn(function()
@@ -1181,6 +1236,7 @@ task.spawn(function()
         autoPickBestCard()
         autoRetry()
         autoClaimQuests()
+        autoBuildUniqueStack()
     end
 end)
 
