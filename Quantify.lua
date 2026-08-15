@@ -1,4 +1,4 @@
--- [[ QUANTIFY PRO HUB - APEX V22.0 CHEAPEST-FIRST AUTO BUILDER ]] --
+-- [[ QUANTIFY PRO HUB - APEX V23.0 ANTI-FALL BUILDER & MATCH SUITE ]] --
 -- Source: https://raw.githubusercontent.com/OL3NNNNNN/quantifyyyyy/refs/heads/main/Quantify.lua
 
 local RAW_URL = "https://raw.githubusercontent.com/OL3NNNNNN/quantifyyyyy/refs/heads/main/Quantify.lua"
@@ -61,8 +61,8 @@ local Config = {
     AutoRetry = true,
     AutoClaimQuests = true,
     
-    -- Auto-Builder Feature (Droppers + Upgraders)
-    AutoBuildStack = true,
+    -- Auto-Builder Feature (Safe Mode)
+    AutoBuildStack = false,
     
     -- Movement & Utilities
     SpeedBoost = false,
@@ -263,7 +263,7 @@ Title.Size = UDim2.new(1, -120, 1, 0)
 Title.Position = UDim2.new(0, 50, 0, 0)
 Title.BackgroundTransparency = 1
 Title.Font = Enum.Font.GothamBold
-Title.Text = "QUANTIFY <font color='#6366F1'>PRO</font> <font color='#38BDF8'>V22</font>"
+Title.Text = "QUANTIFY <font color='#6366F1'>PRO</font> <font color='#38BDF8'>V23</font>"
 Title.RichText = true
 Title.TextColor3 = Colors.TextPrimary
 Title.TextSize = 14
@@ -325,7 +325,7 @@ CardBadge.Size = UDim2.new(0.42, 0, 1, 0)
 CardBadge.Position = UDim2.new(0.58, 0, 0, 0)
 CardBadge.BackgroundTransparency = 1
 CardBadge.Font = Enum.Font.GothamMedium
-CardBadge.Text = "Build: Active"
+CardBadge.Text = "Status: Active"
 CardBadge.TextColor3 = Colors.AccentGold
 CardBadge.TextSize = 10
 CardBadge.TextXAlignment = Enum.TextXAlignment.Right
@@ -687,7 +687,7 @@ end)
 -- ===================================
 createSectionHeader(MainPage, "⚡ Match Automation Core")
 createToggle(MainPage, "Auto Collect Shapes", "Only touches active shapes on conveyors", Config.AutoFarm, function(v) Config.AutoFarm = v end)
-createToggle(MainPage, "🏗️ Auto-Build Machines (Cheapest First)", "Buys cheapest droppers & upgraders and stacks vertically", Config.AutoBuildStack, function(v) Config.AutoBuildStack = v end)
+createToggle(MainPage, "🏗️ Auto-Build Machines (Cheapest First)", "Buys cheapest droppers & upgraders and places safely", Config.AutoBuildStack, function(v) Config.AutoBuildStack = v end)
 createToggle(MainPage, "🥚 Auto Collect Event Eggs", "Background remote claim & proximity collection", Config.AutoCollectEggs, function(v) Config.AutoCollectEggs = v end)
 createToggle(MainPage, "Auto Select Best Card", "Ranks Red, Gold, Emerald & Multiplier Cards", Config.AutoPickBestCard, function(v) Config.AutoPickBestCard = v end)
 createToggle(MainPage, "Auto Retry On Loss", "Restarts match immediately on defeat", Config.AutoRetry, function(v) Config.AutoRetry = v end)
@@ -817,7 +817,7 @@ createActionButton(CreditsPage, "🔄 Reload Configuration", "Reloads saved conf
 end)
 
 createSectionHeader(CreditsPage, "⭐ Release & Repository Info")
-createCreditCard("Quantify Pro Hub (Apex V22.0)", "Complete Cheapest-First Auto Builder Suite", Colors.Accent)
+createCreditCard("Quantify Pro Hub (Apex V23.0)", "Complete Anti-Fall & Safe Placement Suite", Colors.Accent)
 createCreditCard("Developer", "Created by OL3N for Quantify", Colors.AccentGold)
 createCreditCard("GitHub Script URL", "raw.githubusercontent.com/OL3NNNNNN/quantifyyyyy", Colors.AccentCyan)
 createCreditCard("Universal Compatibility", "Works on Medium, Macsploit & UNC Executors", Colors.AccentGreen)
@@ -880,14 +880,27 @@ task.spawn(function()
     end
 end)
 
--- [[ CHEAPEST-FIRST AUTO-BUILDER & COMPACT STACK ENGINE ]] --
+-- Helper: Check if in Voting / Intermission Phase
+local function isVotingPhaseActive()
+    for _, gui in ipairs(playerGui:GetDescendants()) do
+        if gui:IsA("TextLabel") and gui.Visible then
+            local t = string.lower(gui.Text)
+            if t:find("vote for a difficulty") or t:find("voting") then
+                return true
+            end
+        end
+    end
+    return false
+end
+
+-- [[ CHEAPEST-FIRST AUTO-BUILDER & SAFE OFFSET PLACER ]] --
 local lastBuildAttempt = 0
-local stackHeightOffset = 3.0
+local buildXOffset = 4.0
 
 local function autoBuildCheapestFirst()
-    if not Config.AutoBuildStack or not humanoidRootPart then return end
+    if not Config.AutoBuildStack or not humanoidRootPart or isVotingPhaseActive() then return end
     local now = tick()
-    if now - lastBuildAttempt < 1.5 then return end
+    if now - lastBuildAttempt < 2.0 then return end
     lastBuildAttempt = now
 
     local placeRemote = getRemote("PlaceBuilding") or getRemote("Place") or getRemote("Build") or getRemote("PlaceItem")
@@ -910,7 +923,6 @@ local function autoBuildCheapestFirst()
             local isUpgrader = itemName:lower():find("upgrader") or fullText:lower():find("upgrader") or pName:lower():find("upgrader")
 
             if (isDropper or isUpgrader) and not placedUpgradersRegistry[itemName] then
-                -- Parse price in text (e.g. "$15", "100 Q", "$1,500")
                 local price = 999999
                 local cleanPrice = fullText:gsub(",", ""):match("%$(%d+)") or fullText:gsub(",", ""):match("(%d+)%s*Q") or fullText:gsub(",", ""):match("(%d+)")
                 if cleanPrice and tonumber(cleanPrice) then
@@ -932,22 +944,23 @@ local function autoBuildCheapestFirst()
         return a.Price < b.Price
     end)
 
-    -- Purchase and place the cheapest valid machine
+    -- Purchase and place safely to the side (prevents clipping through floor)
     if #candidates > 0 then
         local chosen = candidates[1]
         placedUpgradersRegistry[chosen.Name] = true
         triggerButton(chosen.Button)
 
-        local targetCFrame = CFrame.new(humanoidRootPart.Position + Vector3.new(0, stackHeightOffset, 0))
-        stackHeightOffset = stackHeightOffset + 2.0
+        -- Offset safely from character torso to avoid physics explosion
+        local safeTargetCFrame = CFrame.new(humanoidRootPart.Position + Vector3.new(buildXOffset, 0, 0))
+        buildXOffset = buildXOffset + 3.0
 
         if placeRemote then
             task.spawn(function()
                 pcall(function()
                     if placeRemote:IsA("RemoteFunction") then
-                        placeRemote:InvokeServer(chosen.Name, targetCFrame)
+                        placeRemote:InvokeServer(chosen.Name, safeTargetCFrame)
                     else
-                        placeRemote:FireServer(chosen.Name, targetCFrame)
+                        placeRemote:FireServer(chosen.Name, safeTargetCFrame)
                     end
                 end)
             end)
@@ -1122,7 +1135,6 @@ local function autoVoteDifficulty()
     if now - lastVote < 0.8 then return end
     lastVote = now
 
-    -- Method A: Direct Remote Invocations
     local diffRemote = getRemote("Difficulty")
     if diffRemote then
         task.spawn(function()
@@ -1133,7 +1145,6 @@ local function autoVoteDifficulty()
         end)
     end
 
-    -- Method B: Screen GUI Voting Frame Clicker
     for _, gui in ipairs(playerGui:GetDescendants()) do
         if (gui:IsA("TextButton") or gui:IsA("ImageButton")) and gui.Visible then
             local n = string.lower(gui.Name)
@@ -1169,7 +1180,7 @@ local function autoRetry()
         lastRetry = now
         Stats.RetriesHandled = Stats.RetriesHandled + 1
         placedUpgradersRegistry = {}
-        stackHeightOffset = 3.0
+        buildXOffset = 4.0
         local endedEvent = getRemote("GameEndedEvent")
         if endedEvent then
             task.spawn(function()
@@ -1205,7 +1216,7 @@ end
 
 -- 5. Shape Collector Target Finder (Strict Conveyor Drops ONLY)
 local function getActiveShape()
-    if not Config.AutoFarm then return nil end
+    if not Config.AutoFarm or isVotingPhaseActive() then return nil end
 
     local foldersToCheck = {
         workspace:FindFirstChild("Parts"),
@@ -1237,7 +1248,7 @@ task.spawn(function()
     while task.wait(0.05) do
         local newTarget = nil
         
-        if Config.AutoFarm then
+        if Config.AutoFarm and not isVotingPhaseActive() then
             local shape = getActiveShape()
             if shape then
                 newTarget = shape.Position + Vector3.new(0, 0.4, 0)
@@ -1264,7 +1275,7 @@ end)
 
 -- 8. Target-Only Physics Lock
 RunService.Heartbeat:Connect(function()
-    if not Config.AutoFarm or game.PlaceId ~= PLACE_ID then return end
+    if not Config.AutoFarm or isVotingPhaseActive() or game.PlaceId ~= PLACE_ID then return end
 
     if activeTargetPosition and humanoidRootPart and humanoid and humanoid.Health > 0 then
         humanoidRootPart.CFrame = CFrame.new(activeTargetPosition)
