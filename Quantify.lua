@@ -1,5 +1,5 @@
--- [[ QUANTIFY ULTIMATE APEX PRO HUB - RAYFIELD EDITION ]] --
--- Reverse-Engineered for PlaceId: 73648930852061
+-- [[ QUANTIFY ULTIMATE APEX PRO HUB - LOBBY & MATCH UNIFIED ]] --
+-- Reverse-Engineered for PlaceId: 106281373202161 (Lobby) & 73648930852061 (Match)
 -- Powered by Rayfield Interface Suite (SiriusSoftwareLtd/Rayfield)
 
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
@@ -22,7 +22,7 @@ player.CharacterAdded:Connect(function(newChar)
     humanoid = newChar:WaitForChild("Humanoid")
 end)
 
--- [[ REMOTES CACHE ]] --
+-- [[ REMOTES DISCOVERY & CACHE ]] --
 local Remotes = {}
 local remotesFolder = ReplicatedStorage:WaitForChild("Remotes", 5)
 if remotesFolder then
@@ -40,9 +40,12 @@ local function getRemote(name)
     return nil
 end
 
+-- Detect Place Environment
+local isLobby = (game.PlaceId == 106281373202161) or workspace:FindFirstChild("Lobby") ~= nil
+
 -- [[ CONFIGURATION STATE ]] --
 local Config = {
-    -- Harvester
+    -- Harvester (Match)
     AutoFarm = false,
     CollectRange = 500,
     BatchHarvest = true,
@@ -50,7 +53,7 @@ local Config = {
     AutoOmniDropper = true,
     AutoCrafterEject = true,
     
-    -- Auto-Builder
+    -- Auto-Builder (Match & Lobby Plot)
     AutoBuildStack = false,
     StackSpacing = 3.2,
     PrioritizeDroppers = true,
@@ -62,11 +65,23 @@ local Config = {
     AutoPickBestCard = true,
     AutoRetry = true,
     
-    -- Network Claims
+    -- Lobby Rune Engine
+    AutoRollRunes = false,
+    AutoEquipBestRune = true,
+    AutoBuyVoidRunes = false,
+    AutoPrestigeReroll = false,
+    
+    -- Lobby Rewards & Automation
+    AutoClaimDaily = true,
+    AutoClaimGroupChest = true,
     AutoClaimQuests = true,
     AutoClaimDCC = true,
     AutoWheelSpin = true,
     AutoCollectEggs = true,
+    
+    -- Building Box Engine
+    AutoOpenBoxMode = "None",
+    BoxStopThreshold = 500,
     
     -- Visuals & Physics
     SpeedBoost = false,
@@ -83,15 +98,15 @@ local placedUpgradersRegistry = {}
 local fixedStackBasePosition = nil
 local currentStackHeight = 3.5
 
--- [[ RAYFIELD WINDOW INITIALIZATION ]] --
+-- [[ RAYFIELD WINDOW ]] --
 local Window = Rayfield:CreateWindow({
-    Name = "Quantify Apex Pro Hub | V30.0",
+    Name = "Quantify Apex Pro Hub | Unified Suite",
     LoadingTitle = "Quantify Apex Hub",
-    LoadingSubtitle = "by OL3N (Rayfield Edition)",
+    LoadingSubtitle = isLobby and "Lobby Edition (Place: " .. tostring(game.PlaceId) .. ")" or "Match Edition (Place: " .. tostring(game.PlaceId) .. ")",
     ConfigurationSaving = {
         Enabled = true,
         FolderName = "QuantifyHubConfig",
-        FileName = "ApexSettings"
+        FileName = "UnifiedSettings"
     },
     Discord = {
         Enabled = false,
@@ -102,14 +117,84 @@ local Window = Rayfield:CreateWindow({
 })
 
 -- [[ TABS ]] --
+local TabLobby = Window:CreateTab("Lobby & Runes 🔮", 4483362458)
 local TabFarm = Window:CreateTab("Harvester ⚡", 4483362458)
 local TabBuilder = Window:CreateTab("Auto-Builder 🏗️", 4483362458)
 local TabMatch = Window:CreateTab("Match AI 🎯", 4483362458)
-local TabNetwork = Window:CreateTab("Rewards & Net 🎁", 4483362458)
+local TabRewards = Window:CreateTab("Network & Chests 🎁", 4483362458)
 local TabMovement = Window:CreateTab("Exploits & ESP 👁️", 4483362458)
 
 -- =========================================================================
--- TAB 1: HARVESTER
+-- TAB 1: LOBBY & RUNES ENGINE
+-- =========================================================================
+TabLobby:CreateSection("🔮 Rune Rolling & Loadouts")
+
+TabLobby:CreateToggle({
+    Name = "Auto Roll Runes (Multi-Roll)",
+    CurrentValue = Config.AutoRollRunes,
+    Flag = "AutoRollRunesFlag",
+    Callback = function(Value) Config.AutoRollRunes = Value end,
+})
+
+TabLobby:CreateToggle({
+    Name = "Auto Equip Rolled Runes",
+    CurrentValue = Config.AutoEquipBestRune,
+    Flag = "AutoEquipRuneFlag",
+    Callback = function(Value) Config.AutoEquipBestRune = Value end,
+})
+
+TabLobby:CreateToggle({
+    Name = "Auto Buy Void Runes",
+    CurrentValue = Config.AutoBuyVoidRunes,
+    Flag = "AutoVoidRunesFlag",
+    Callback = function(Value) Config.AutoBuyVoidRunes = Value end,
+})
+
+TabLobby:CreateToggle({
+    Name = "Auto Reroll Prestige Runes",
+    CurrentValue = Config.AutoPrestigeReroll,
+    Flag = "AutoPrestigeRerollFlag",
+    Callback = function(Value) Config.AutoPrestigeReroll = Value end,
+})
+
+TabLobby:CreateButton({
+    Name = "🎲 Roll Single Rune Now",
+    Callback = function()
+        local roll = getRemote("RollRune")
+        if roll then
+            task.spawn(function()
+                local res = roll:InvokeServer()
+                Rayfield:Notify({
+                    Title = "Rune Rolled",
+                    Content = "Result: " .. tostring(res),
+                    Duration = 3,
+                    Image = 4483362458,
+                })
+            end)
+        end
+    end,
+})
+
+TabLobby:CreateButton({
+    Name = "🌌 Buy Void Rune Now",
+    Callback = function()
+        local voidRune = getRemote("BuyVoidRune")
+        if voidRune then
+            task.spawn(function()
+                local res = voidRune:InvokeServer()
+                Rayfield:Notify({
+                    Title = "Void Rune Purchase",
+                    Content = "Status: " .. tostring(res),
+                    Duration = 3,
+                    Image = 4483362458,
+                })
+            end)
+        end
+    end,
+})
+
+-- =========================================================================
+-- TAB 2: HARVESTER (MATCH MODE)
 -- =========================================================================
 TabFarm:CreateSection("⚡ Shape Collector Core")
 
@@ -161,7 +246,7 @@ TabFarm:CreateToggle({
 })
 
 -- =========================================================================
--- TAB 2: AUTO-BUILDER
+-- TAB 3: AUTO-BUILDER
 -- =========================================================================
 TabBuilder:CreateSection("🏗️ Apex Vertical Chute Stacker")
 
@@ -212,7 +297,7 @@ TabBuilder:CreateButton({
 })
 
 -- =========================================================================
--- TAB 3: MATCH AI & DIFFICULTY
+-- TAB 4: MATCH AI & DIFFICULTY
 -- =========================================================================
 TabMatch:CreateSection("🎯 Match AI & Card Engine")
 
@@ -242,60 +327,69 @@ TabMatch:CreateDropdown({
     Options = {"Easy", "Normal", "Hard", "Insane", "UNQUANTIFIABLE"},
     CurrentOption = Config.SelectedDifficulty,
     Flag = "DifficultyDropdownFlag",
-    Callback = function(Option)
-        Config.SelectedDifficulty = Option
-    end,
+    Callback = function(Option) Config.SelectedDifficulty = Option end,
 })
 
 -- =========================================================================
--- TAB 4: REWARDS & NETWORK
+-- TAB 5: REWARDS, CHESTS & NETWORK
 -- =========================================================================
-TabNetwork:CreateSection("🎁 Automatic Network Claims")
+TabRewards:CreateSection("🎁 Automatic Rewards & Chests")
 
-TabNetwork:CreateToggle({
-    Name = "Auto Claim Quests (Daily & Completed)",
+TabRewards:CreateToggle({
+    Name = "Auto Claim Daily Calendar (ClaimDaily)",
+    CurrentValue = Config.AutoClaimDaily,
+    Flag = "AutoClaimDailyFlag",
+    Callback = function(Value) Config.AutoClaimDaily = Value end,
+})
+
+TabRewards:CreateToggle({
+    Name = "Auto Claim Group Chest (GroupChestOpen)",
+    CurrentValue = Config.AutoClaimGroupChest,
+    Flag = "AutoGroupChestFlag",
+    Callback = function(Value) Config.AutoClaimGroupChest = Value end,
+})
+
+TabRewards:CreateToggle({
+    Name = "Auto Claim Quests (QuestFunc)",
     CurrentValue = Config.AutoClaimQuests,
     Flag = "AutoClaimQuestsFlag",
     Callback = function(Value) Config.AutoClaimQuests = Value end,
 })
 
-TabNetwork:CreateToggle({
-    Name = "Auto Claim DCC Challenges",
+TabRewards:CreateToggle({
+    Name = "Auto Claim DCC Challenges (DCCReward)",
     CurrentValue = Config.AutoClaimDCC,
     Flag = "AutoClaimDCCFlag",
     Callback = function(Value) Config.AutoClaimDCC = Value end,
 })
 
-TabNetwork:CreateToggle({
-    Name = "Auto Spin Daily Wheel",
+TabRewards:CreateToggle({
+    Name = "Auto Spin Daily Wheel (WheelSpin)",
     CurrentValue = Config.AutoWheelSpin,
     Flag = "AutoWheelSpinFlag",
     Callback = function(Value) Config.AutoWheelSpin = Value end,
 })
 
-TabNetwork:CreateToggle({
-    Name = "Auto Collect Event Eggs",
-    CurrentValue = Config.AutoCollectEggs,
-    Flag = "AutoCollectEggsFlag",
-    Callback = function(Value) Config.AutoCollectEggs = Value end,
-})
-
-TabNetwork:CreateButton({
-    Name = "⚡ Force Claim All Rewards Now",
+TabRewards:CreateButton({
+    Name = "⚡ Claim Everything (Daily, Chest, Quests, DCC, Wheel)",
     Callback = function()
-        local daily = getRemote("DailyQuest")
-        local comp = getRemote("CompletedQuest")
+        local claimDaily = getRemote("ClaimDaily")
+        local groupChest = getRemote("GroupChestOpen")
+        local questFunc = getRemote("QuestFunc")
         local dcc = getRemote("DCCReward")
         local dccComp = getRemote("DCCComplete")
         local wheel = getRemote("WheelSpin")
-        if daily then pcall(function() daily:FireServer("Claim") end) end
-        if comp then pcall(function() comp:FireServer("Claim") end) end
+        
+        if claimDaily then task.spawn(function() pcall(function() claimDaily:InvokeServer() end) end) end
+        if groupChest then pcall(function() groupChest:FireServer() end) end
+        if questFunc then task.spawn(function() pcall(function() questFunc:InvokeServer("Claim") end) end) end
         if dcc then pcall(function() dcc:FireServer() end) end
         if dccComp then pcall(function() dccComp:FireServer() end) end
         if wheel then pcall(function() wheel:FireServer() end) end
+        
         Rayfield:Notify({
-            Title = "Network Remotes Dispatched",
-            Content = "Sent claim packets for Daily, Quests, DCC and Wheel.",
+            Title = "Rewards Dispatched",
+            Content = "Fired ClaimDaily, GroupChestOpen, Quests, DCC, and Wheel!",
             Duration = 4,
             Image = 4483362458,
         })
@@ -303,7 +397,7 @@ TabNetwork:CreateButton({
 })
 
 -- =========================================================================
--- TAB 5: EXPLOITS & ESP
+-- TAB 6: EXPLOITS & ESP
 -- =========================================================================
 TabMovement:CreateSection("🏃 Character Physics")
 
@@ -395,7 +489,7 @@ local function triggerButton(btn)
     end
 end
 
--- Live Currency Reader
+-- Currency Reader
 local function getLiveQubitNumber()
     local attr = player:GetAttribute("Qubits") or player:GetAttribute("Currency") or player:GetAttribute("Money") or player:GetAttribute("Cash")
     if attr and tonumber(attr) then return tonumber(attr) end
@@ -488,7 +582,7 @@ local function getActiveShapesList()
     return candidates
 end
 
--- Conveyor Baseline Finder
+-- Baseline Conveyor Finder
 local function findConveyorBasePosition()
     if fixedStackBasePosition then return fixedStackBasePosition end
     local map = workspace:FindFirstChild("Map") or workspace
@@ -518,7 +612,7 @@ local function findConveyorBasePosition()
     return Vector3.new(0, 5, 0)
 end
 
--- Auto-Build Engine
+-- Auto-Build Engine (With BuildingPurchase & PlaceBuilding Fallback)
 local lastBuildAttempt = 0
 local function autoBuildVerticalStack()
     if not Config.AutoBuildStack or not humanoidRootPart then return end
@@ -528,7 +622,7 @@ local function autoBuildVerticalStack()
 
     local basePos = findConveyorBasePosition()
     local placeRemote = getRemote("PlaceBuilding") or getRemote("Place") or getRemote("Build") or getRemote("PlaceItem")
-    local buyRemote = getRemote("BoughtItem") or getRemote("BuyBuilding") or getRemote("BuyItem") or getRemote("Buy")
+    local buyRemote = getRemote("BuildingPurchase") or getRemote("BoughtItem") or getRemote("BuyBuilding") or getRemote("BuyItem") or getRemote("Buy")
     local currentQubits = getLiveQubitNumber()
     local playerGui = player:FindFirstChild("PlayerGui")
     if not playerGui then return end
@@ -785,17 +879,37 @@ local function autoRetry()
     end
 end
 
--- Background Network Claims
+-- Background Network Claims (Lobby + Match Remotes)
 local lastNetClaims = 0
 local function autoNetworkClaims()
     local now = tick()
     if now - lastNetClaims < 6 then return end
     lastNetClaims = now
 
+    if Config.AutoClaimDaily then
+        local claimDaily = getRemote("ClaimDaily") or getRemote("DailyQuest")
+        if claimDaily then
+            task.spawn(function()
+                if claimDaily:IsA("RemoteFunction") then pcall(function() claimDaily:InvokeServer() end)
+                else pcall(function() claimDaily:FireServer("Claim") end) end
+            end)
+        end
+    end
+
+    if Config.AutoClaimGroupChest then
+        local groupChest = getRemote("GroupChestOpen")
+        if groupChest then pcall(function() groupChest:FireServer() end) end
+    end
+
     if Config.AutoClaimQuests then
-        local daily = getRemote("DailyQuest")
+        local questFunc = getRemote("QuestFunc") or getRemote("DailyQuest")
         local comp = getRemote("CompletedQuest")
-        if daily then pcall(function() daily:FireServer("Claim") end) end
+        if questFunc then
+            task.spawn(function()
+                if questFunc:IsA("RemoteFunction") then pcall(function() questFunc:InvokeServer("Claim") end)
+                else pcall(function() questFunc:FireServer("Claim") end) end
+            end)
+        end
         if comp then pcall(function() comp:FireServer("Claim") end) end
     end
 
@@ -805,12 +919,45 @@ local function autoNetworkClaims()
         local dccComp = getRemote("DCCComplete")
         if dccRew then pcall(function() dccRew:FireServer() end) end
         if dccComp then pcall(function() dccComp:FireServer() end) end
-        if dccFunc then pcall(function() dccFunc:InvokeServer("Claim") end) end
+        if dccFunc then task.spawn(function() pcall(function() dccFunc:InvokeServer("Claim") end) end) end
     end
 
     if Config.AutoWheelSpin then
         local wheel = getRemote("WheelSpin")
         if wheel then pcall(function() wheel:FireServer() end) end
+    end
+end
+
+-- Auto Rune Roller (Lobby Mode)
+local lastRuneRoll = 0
+local function autoRuneEngine()
+    if not Config.AutoRollRunes then return end
+    local now = tick()
+    if now - lastRuneRoll < 0.6 then return end
+    lastRuneRoll = now
+
+    local rollMulti = getRemote("RollRuneMulti") or getRemote("RollRune")
+    local equipRune = getRemote("EquipRolledRune")
+    local buyVoid = getRemote("BuyVoidRune")
+    local rerollPrestige = getRemote("RerollPrestigeRune")
+
+    if rollMulti then
+        task.spawn(function()
+            pcall(function()
+                local res = rollMulti:InvokeServer()
+                if Config.AutoEquipBestRune and equipRune then
+                    equipRune:InvokeServer()
+                end
+            end)
+        end)
+    end
+
+    if Config.AutoBuyVoidRunes and buyVoid then
+        task.spawn(function() pcall(function() buyVoid:InvokeServer() end) end)
+    end
+
+    if Config.AutoPrestigeReroll and rerollPrestige then
+        task.spawn(function() pcall(function() rerollPrestige:InvokeServer() end) end)
     end
 end
 
@@ -918,6 +1065,7 @@ task.spawn(function()
         autoBuildVerticalStack()
         autoOmniAndCrafter()
         autoNetworkClaims()
+        autoRuneEngine()
     end
 end)
 
@@ -932,8 +1080,8 @@ RunService.Heartbeat:Connect(function()
 end)
 
 Rayfield:Notify({
-    Title = "Quantify Apex Pro Loaded",
-    Content = "All reverse-engineered network modules ready!",
+    Title = "Quantify Apex Unified Hub Loaded",
+    Content = isLobby and "Lobby & Rune features ready!" or "Match Harvester & Auto-Builder ready!",
     Duration = 5,
     Image = 4483362458,
 })
