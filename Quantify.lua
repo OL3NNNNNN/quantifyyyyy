@@ -1,21 +1,20 @@
 -- [[ Quantify Pro Hub - Complete Automation Suite ]] --
--- GitHub Repository Release
+-- Source: https://raw.githubusercontent.com/OL3NNNNNN/quantifyyyyy/refs/heads/main/Quantify.lua
+
+local RAW_URL = "https://raw.githubusercontent.com/OL3NNNNNN/quantifyyyyy/refs/heads/main/Quantify.lua"
+if getgenv then getgenv().QuantifySourceUrl = RAW_URL end
 
 -- Auto-Execute / Teleport Persistence
 if typeof(queue_on_teleport) == "function" then
-    queue_on_teleport([[
+    queue_on_teleport(string.format([[
         task.wait(1.5)
-        if getgenv and getgenv().QuantifySourceUrl then
-            loadstring(game:HttpGet(getgenv().QuantifySourceUrl))()
-        end
-    ]])
+        loadstring(game:HttpGet(%q))()
+    ]], RAW_URL))
 elseif syn and typeof(syn.queue_on_teleport) == "function" then
-    syn.queue_on_teleport([[
+    syn.queue_on_teleport(string.format([[
         task.wait(1.5)
-        if getgenv and getgenv().QuantifySourceUrl then
-            loadstring(game:HttpGet(getgenv().QuantifySourceUrl))()
-        end
-    ]])
+        loadstring(game:HttpGet(%q))()
+    ]], RAW_URL))
 end
 
 -- Prevent Multi-Instance UI Duplication
@@ -36,7 +35,6 @@ local TweenService = game:GetService("TweenService")
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 
--- Safe GUI container resolution (gethui > CoreGui > PlayerGui)
 local function getSafeGuiParent()
     if typeof(gethui) == "function" then
         return gethui()
@@ -56,6 +54,7 @@ local DifficultyRemote = Remotes:WaitForChild("Difficulty")
 local GameEndedEvent = Remotes:WaitForChild("GameEndedEvent")
 local DailyQuestEvent = Remotes:FindFirstChild("DailyQuest")
 local CompletedQuestEvent = Remotes:FindFirstChild("CompletedQuest")
+local CodeRemote = Remotes:FindFirstChild("Code")
 
 local shapeFolders = {
     workspace:WaitForChild("Parts"),
@@ -69,6 +68,7 @@ local Config = {
     AutoVoteInsane = true,
     AutoRetry = true,
     AutoClaimQuests = true,
+    AutoCodes = true,
 }
 
 local Stats = {
@@ -98,8 +98,8 @@ if getgenv then getgenv().QuantifyHubUI = ScreenGui end
 
 local MainFrame = Instance.new("Frame")
 MainFrame.Name = "MainFrame"
-MainFrame.Size = UDim2.new(0, 320, 0, 305)
-MainFrame.Position = UDim2.new(0.04, 0, 0.28, 0)
+MainFrame.Size = UDim2.new(0, 320, 0, 345)
+MainFrame.Position = UDim2.new(0.04, 0, 0.25, 0)
 MainFrame.BackgroundColor3 = Color3.fromRGB(15, 17, 23)
 MainFrame.BorderSizePixel = 0
 MainFrame.Active = true
@@ -146,7 +146,7 @@ MinBtn.TextColor3 = Color3.fromRGB(180, 185, 205)
 MinBtn.TextSize = 13
 Instance.new("UICorner", MinBtn).CornerRadius = UDim.new(0, 6)
 
--- Content Container
+-- Content Area
 local Content = Instance.new("Frame", MainFrame)
 Content.Size = UDim2.new(1, -20, 1, -54)
 Content.Position = UDim2.new(0, 10, 0, 48)
@@ -154,13 +154,13 @@ Content.BackgroundTransparency = 1
 
 local ListLayout = Instance.new("UIListLayout", Content)
 ListLayout.FillDirection = Enum.FillDirection.Vertical
-ListLayout.Padding = UDim.new(0, 6)
+ListLayout.Padding = UDim.new(0, 5)
 ListLayout.SortOrder = Enum.SortOrder.LayoutOrder
 
 -- Toggle Switch Component Builder
 local function createToggle(text, defaultState, callback, order)
     local row = Instance.new("Frame", Content)
-    row.Size = UDim2.new(1, 0, 0, 36)
+    row.Size = UDim2.new(1, 0, 0, 34)
     row.BackgroundColor3 = Color3.fromRGB(22, 25, 35)
     row.BorderSizePixel = 0
     row.LayoutOrder = order or 1
@@ -209,13 +209,14 @@ createToggle("Auto Collect Shapes", Config.AutoFarm, function(v) Config.AutoFarm
 createToggle("Auto Vote Insane", Config.AutoVoteInsane, function(v) Config.AutoVoteInsane = v end, 2)
 createToggle("Auto Retry on Loss", Config.AutoRetry, function(v) Config.AutoRetry = v end, 3)
 createToggle("Auto Claim Daily Quests", Config.AutoClaimQuests, function(v) Config.AutoClaimQuests = v end, 4)
+createToggle("Auto Redeem Active Codes", Config.AutoCodes, function(v) Config.AutoCodes = v end, 5)
 
 -- Stats / Status Footer
 local StatsRow = Instance.new("Frame", Content)
 StatsRow.Size = UDim2.new(1, 0, 0, 48)
 StatsRow.BackgroundColor3 = Color3.fromRGB(18, 20, 28)
 StatsRow.BorderSizePixel = 0
-StatsRow.LayoutOrder = 5
+StatsRow.LayoutOrder = 6
 Instance.new("UICorner", StatsRow).CornerRadius = UDim.new(0, 8)
 
 local StatusDot = Instance.new("Frame", StatsRow)
@@ -249,7 +250,7 @@ local isMinimized = false
 MinBtn.MouseButton1Click:Connect(function()
     isMinimized = not isMinimized
     Content.Visible = not isMinimized
-    local newSize = isMinimized and UDim2.new(0, 320, 0, 42) or UDim2.new(0, 320, 0, 305)
+    local newSize = isMinimized and UDim2.new(0, 320, 0, 42) or UDim2.new(0, 320, 0, 345)
     TweenService:Create(MainFrame, TweenInfo.new(0.2, Enum.EasingStyle.Quad), {Size = newSize}):Play()
     MinBtn.Text = isMinimized and "+" or "-"
 end)
@@ -271,7 +272,7 @@ local function autoVoteInsane()
     end
 end
 
--- 2. Auto Retry (Uses exact caught GameEndedEvent remote)
+-- 2. Auto Retry
 local lastRetry = 0
 local function autoRetry()
     if not Config.AutoRetry then return end
@@ -321,7 +322,28 @@ local function autoClaimQuests()
     end)
 end
 
--- 4. Shape Target Finder
+-- 4. Auto Redeem Codes
+local codesClaimed = false
+local function autoRedeemCodes()
+    if not Config.AutoCodes or codesClaimed or not CodeRemote then return end
+    codesClaimed = true
+
+    local commonCodes = {"RELEASE", "QUANTIFY", "UPDATE", "SUMMER", "SHAPES"}
+    task.spawn(function()
+        for _, code in ipairs(commonCodes) do
+            pcall(function()
+                if CodeRemote:IsA("RemoteFunction") then
+                    CodeRemote:InvokeServer(code)
+                elseif CodeRemote:IsA("RemoteEvent") then
+                    CodeRemote:FireServer(code)
+                end
+            end)
+            task.wait(0.5)
+        end
+    end)
+end
+
+-- 5. Shape Target Finder
 local function getActiveShape()
     if not Config.AutoFarm then return nil end
 
@@ -350,8 +372,9 @@ local function getActiveShape()
     return nil
 end
 
--- 5. Main Automation Loop
+-- 6. Main Automation Loop
 task.spawn(function()
+    autoRedeemCodes()
     while task.wait(0.05) do
         if Config.AutoFarm then
             local target = getActiveShape()
@@ -363,7 +386,7 @@ task.spawn(function()
     end
 end)
 
--- 6. Jitter-Free Physics Lock (Heartbeat Sync)
+-- 7. Jitter-Free Physics Lock (Heartbeat Sync)
 RunService.Heartbeat:Connect(function()
     if not Config.AutoFarm or game.PlaceId ~= PLACE_ID then return end
 
