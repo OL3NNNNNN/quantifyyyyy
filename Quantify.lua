@@ -1,4 +1,4 @@
--- [[ QUANTIFY PRO HUB - APEX V25.0 AUTO-INVENTORY & FIXED SPOT BUILDER ]] --
+-- [[ QUANTIFY PRO HUB - APEX V26.0 DIRECT PURCHASE & AUTO-PLACE ENGINE ]] --
 -- Source: https://raw.githubusercontent.com/OL3NNNNNN/quantifyyyyy/refs/heads/main/Quantify.lua
 
 local RAW_URL = "https://raw.githubusercontent.com/OL3NNNNNN/quantifyyyyy/refs/heads/main/Quantify.lua"
@@ -118,6 +118,7 @@ local humanoid = character:WaitForChild("Humanoid")
 local activeTargetPosition = nil
 local placedUpgradersRegistry = {}
 local fixedBuildOrigin = nil
+local buildItemCount = 0
 
 player.CharacterAdded:Connect(function(newChar)
     character = newChar
@@ -126,6 +127,7 @@ player.CharacterAdded:Connect(function(newChar)
     activeTargetPosition = nil
     placedUpgradersRegistry = {}
     fixedBuildOrigin = nil
+    buildItemCount = 0
     
     if Config.SpeedBoost and humanoid then
         humanoid.WalkSpeed = Config.SpeedValue
@@ -264,7 +266,7 @@ Title.Size = UDim2.new(1, -120, 1, 0)
 Title.Position = UDim2.new(0, 50, 0, 0)
 Title.BackgroundTransparency = 1
 Title.Font = Enum.Font.GothamBold
-Title.Text = "QUANTIFY <font color='#6366F1'>PRO</font> <font color='#38BDF8'>V25</font>"
+Title.Text = "QUANTIFY <font color='#6366F1'>PRO</font> <font color='#38BDF8'>V26</font>"
 Title.RichText = true
 Title.TextColor3 = Colors.TextPrimary
 Title.TextSize = 14
@@ -326,7 +328,7 @@ CardBadge.Size = UDim2.new(0.42, 0, 1, 0)
 CardBadge.Position = UDim2.new(0.58, 0, 0, 0)
 CardBadge.BackgroundTransparency = 1
 CardBadge.Font = Enum.Font.GothamMedium
-CardBadge.Text = "Auto-Build: ON"
+CardBadge.Text = "Status: Active"
 CardBadge.TextColor3 = Colors.AccentGold
 CardBadge.TextSize = 10
 CardBadge.TextXAlignment = Enum.TextXAlignment.Right
@@ -688,7 +690,7 @@ end)
 -- ===================================
 createSectionHeader(MainPage, "⚡ Match Automation Core")
 createToggle(MainPage, "Auto Collect Shapes", "Instantly touches and collects active shapes", Config.AutoFarm, function(v) Config.AutoFarm = v end)
-createToggle(MainPage, "🏗️ Auto-Open Shop & Build Machines", "Auto opens inventory/shop & places machines at your base spot", Config.AutoBuildStack, function(v) Config.AutoBuildStack = v end)
+createToggle(MainPage, "🏗️ Auto-Buy & Place Droppers/Upgraders", "Buys droppers & upgraders and places them safely in row", Config.AutoBuildStack, function(v) Config.AutoBuildStack = v end)
 createToggle(MainPage, "🥚 Auto Collect Event Eggs", "Background remote claim & proximity collection", Config.AutoCollectEggs, function(v) Config.AutoCollectEggs = v end)
 createToggle(MainPage, "Auto Select Best Card", "Ranks Red, Gold, Emerald & Multiplier Cards", Config.AutoPickBestCard, function(v) Config.AutoPickBestCard = v end)
 createToggle(MainPage, "Auto Retry On Loss", "Restarts match immediately on defeat", Config.AutoRetry, function(v) Config.AutoRetry = v end)
@@ -818,7 +820,7 @@ createActionButton(CreditsPage, "🔄 Reload Configuration", "Reloads saved conf
 end)
 
 createSectionHeader(CreditsPage, "⭐ Release & Repository Info")
-createCreditCard("Quantify Pro Hub (Apex V25.0)", "Fixed Base Spot & Auto Inventory Engine", Colors.Accent)
+createCreditCard("Quantify Pro Hub (Apex V26.0)", "Direct Buy & Row Placement Engine", Colors.Accent)
 createCreditCard("Developer", "Created by OL3N for Quantify", Colors.AccentGold)
 createCreditCard("GitHub Script URL", "raw.githubusercontent.com/OL3NNNNNN/quantifyyyyy", Colors.AccentCyan)
 createCreditCard("Universal Compatibility", "Works on Medium, Macsploit & UNC Executors", Colors.AccentGreen)
@@ -881,54 +883,24 @@ task.spawn(function()
     end
 end)
 
--- Helper: Check if in Voting / Intermission Phase
-local function isVotingPhaseActive()
-    for _, gui in ipairs(playerGui:GetDescendants()) do
-        if (gui:IsA("TextLabel") or gui:IsA("TextButton")) and gui.Visible then
-            local t = string.lower(gui.Text)
-            if t:find("vote for a difficulty") or t:find("voting") then
-                return true
-            end
-        end
-    end
-    return false
-end
-
--- [[ AUTO-INVENTORY & FIXED BASE SPOT BUILDER ]] --
+-- [[ DIRECT AUTO-BUY & FIXED ROW BUILDER ]] --
 local lastBuildAttempt = 0
-local buildItemCount = 0
 
-local function autoOpenShopAndBuild()
-    if not Config.AutoBuildStack or not humanoidRootPart or isVotingPhaseActive() then return end
+local function autoBuyAndPlaceMachines()
+    if not Config.AutoBuildStack or not humanoidRootPart then return end
     local now = tick()
-    if now - lastBuildAttempt < 1.5 then return end
+    if now - lastBuildAttempt < 1.2 then return end
     lastBuildAttempt = now
 
-    -- Set the fixed base build origin
     if not fixedBuildOrigin then
         fixedBuildOrigin = humanoidRootPart.Position + Vector3.new(4, 0, 0)
     end
 
-    -- Auto-open Inventory if closed
-    local invBtn = playerGui:FindFirstChild("Side") and playerGui.Side:FindFirstChild("Left") and playerGui.Side.Left:FindFirstChild("Inventory")
-    if invBtn then
-        local btn = invBtn:FindFirstChildWhichIsA("GuiButton")
-        if btn then triggerButton(btn) end
-    else
-        for _, gui in ipairs(playerGui:GetDescendants()) do
-            if gui:IsA("TextButton") and gui.Visible then
-                local t = string.lower(gui.Text)
-                if t:find("inventory") or t:find("building shop") then
-                    triggerButton(gui)
-                end
-            end
-        end
-    end
-
     local placeRemote = getRemote("PlaceBuilding") or getRemote("Place") or getRemote("Build") or getRemote("PlaceItem")
+    local buyRemote = getRemote("BuyBuilding") or getRemote("BuyItem") or getRemote("Buy")
     local candidates = {}
 
-    -- Scan for machines in UI
+    -- Scan for shop buttons with prices
     for _, gui in ipairs(playerGui:GetDescendants()) do
         if (gui:IsA("TextButton") or gui:IsA("ImageButton")) and gui.Visible then
             local itemName = gui.Name
@@ -968,12 +940,27 @@ local function autoOpenShopAndBuild()
     if #candidates > 0 then
         local chosen = candidates[1]
         placedUpgradersRegistry[chosen.Name] = true
+        
+        -- Direct button trigger
         triggerButton(chosen.Button)
 
-        -- Fixed place location beside your base origin (not following mouse cursor)
+        -- Direct Remote Purchase Attempt
+        if buyRemote then
+            task.spawn(function()
+                pcall(function()
+                    if buyRemote:IsA("RemoteFunction") then
+                        buyRemote:InvokeServer(chosen.Name)
+                    else
+                        buyRemote:FireServer(chosen.Name)
+                    end
+                end)
+            end)
+        end
+
         local spotCFrame = CFrame.new(fixedBuildOrigin + Vector3.new(buildItemCount * 3.5, 0, 0))
         buildItemCount = buildItemCount + 1
 
+        -- Direct Remote Placement Attempt
         if placeRemote then
             task.spawn(function()
                 pcall(function()
@@ -1291,7 +1278,7 @@ task.spawn(function()
         autoPickBestCard()
         autoRetry()
         autoClaimQuests()
-        autoOpenShopAndBuild()
+        autoBuyAndPlaceMachines()
     end
 end)
 
