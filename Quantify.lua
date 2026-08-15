@@ -1,4 +1,4 @@
--- [[ QUANTIFY PRO HUB - APEX V10.0 ULTRA-FAST BOX BURST EDITION ]] --
+-- [[ QUANTIFY PRO HUB - APEX V11.0 DYNAMIC MAP FIX ]] --
 -- Source: https://raw.githubusercontent.com/OL3NNNNNN/quantifyyyyy/refs/heads/main/Quantify.lua
 
 local RAW_URL = "https://raw.githubusercontent.com/OL3NNNNNN/quantifyyyyy/refs/heads/main/Quantify.lua"
@@ -49,7 +49,6 @@ end
 
 local guiParent = getSafeGuiParent()
 local PLACE_ID = 73648930852061
-local spawnPos = Vector3.new(62.154415130615234, 25.5, 1298.9)
 local CONFIG_FILE = "QuantifyProConfig.json"
 
 -- [[ CONFIG STATE & PERSISTENCE ]] --
@@ -113,13 +112,32 @@ local Stats = {
 local character = player.Character or player.CharacterAdded:Wait()
 local humanoidRootPart = character:WaitForChild("HumanoidRootPart")
 local humanoid = character:WaitForChild("Humanoid")
-local currentDestination = spawnPos
+
+-- Dynamic Arena Anchor
+local currentArenaAnchor = humanoidRootPart.Position
+local currentDestination = currentArenaAnchor
+
+local function updateArenaAnchor()
+    local map = workspace:FindFirstChild("Map")
+    if map then
+        local spawnPart = map:FindFirstChild("PartSpawn") or map:FindFirstChild("SpawnLocation") or map:FindFirstChildWhichIsA("SpawnLocation")
+        if spawnPart and spawnPart:IsA("BasePart") then
+            currentArenaAnchor = spawnPart.Position + Vector3.new(0, 3, 0)
+            return
+        end
+    end
+    if humanoidRootPart then
+        currentArenaAnchor = humanoidRootPart.Position
+    end
+end
 
 player.CharacterAdded:Connect(function(newChar)
     character = newChar
     humanoidRootPart = newChar:WaitForChild("HumanoidRootPart")
     humanoid = newChar:WaitForChild("Humanoid")
-    currentDestination = spawnPos
+    task.wait(0.5)
+    updateArenaAnchor()
+    currentDestination = currentArenaAnchor
     
     if Config.SpeedBoost and humanoid then
         humanoid.WalkSpeed = Config.SpeedValue
@@ -127,10 +145,16 @@ player.CharacterAdded:Connect(function(newChar)
 end)
 
 -- Safe Remote Helper
+local cachedRemotes = {}
 local function getRemote(name)
+    if cachedRemotes[name] then return cachedRemotes[name] end
     local remotesFolder = ReplicatedStorage:FindFirstChild("Remotes")
     if remotesFolder then
-        return remotesFolder:FindFirstChild(name)
+        local r = remotesFolder:FindFirstChild(name)
+        if r then
+            cachedRemotes[name] = r
+            return r
+        end
     end
     return nil
 end
@@ -150,25 +174,24 @@ local function triggerButton(btn)
 end
 
 -- Live Qubit Reader
+local cachedQubits = 0
 local function getLiveQubitNumber()
     local attr = player:GetAttribute("Qubits") or player:GetAttribute("Currency") or player:GetAttribute("Money")
-    if attr and tonumber(attr) then return tonumber(attr) end
+    if attr and tonumber(attr) then 
+        cachedQubits = tonumber(attr)
+        return cachedQubits 
+    end
 
     local leaderstats = player:FindFirstChild("leaderstats")
     if leaderstats then
         local qubitObj = leaderstats:FindFirstChild("Qubits") or leaderstats:FindFirstChild("Qubit") or leaderstats:FindFirstChild("Cash")
-        if qubitObj and tonumber(qubitObj.Value) then return tonumber(qubitObj.Value) end
-    end
-
-    local getData = getRemote("GetData")
-    if getData and getData:IsA("RemoteFunction") then
-        local success, data = pcall(function() return getData:InvokeServer() end)
-        if success and typeof(data) == "table" and data.Qubits and tonumber(data.Qubits) then
-            return tonumber(data.Qubits)
+        if qubitObj and tonumber(qubitObj.Value) then 
+            cachedQubits = tonumber(qubitObj.Value)
+            return cachedQubits 
         end
     end
 
-    return 0
+    return cachedQubits
 end
 
 local function formatNumber(n)
@@ -253,7 +276,7 @@ Title.Size = UDim2.new(1, -120, 1, 0)
 Title.Position = UDim2.new(0, 50, 0, 0)
 Title.BackgroundTransparency = 1
 Title.Font = Enum.Font.GothamBold
-Title.Text = "QUANTIFY <font color='#6366F1'>PRO</font> <font color='#38BDF8'>V10</font>"
+Title.Text = "QUANTIFY <font color='#6366F1'>PRO</font> <font color='#38BDF8'>V11</font>"
 Title.RichText = true
 Title.TextColor3 = Colors.TextPrimary
 Title.TextSize = 14
@@ -315,7 +338,7 @@ CardBadge.Size = UDim2.new(0.42, 0, 1, 0)
 CardBadge.Position = UDim2.new(0.58, 0, 0, 0)
 CardBadge.BackgroundTransparency = 1
 CardBadge.Font = Enum.Font.GothamMedium
-CardBadge.Text = "Eggs: 0"
+CardBadge.Text = "Boxes: 0"
 CardBadge.TextColor3 = Colors.AccentGold
 CardBadge.TextSize = 10
 CardBadge.TextXAlignment = Enum.TextXAlignment.Right
@@ -560,7 +583,7 @@ local function createInputRow(parent, labelText, defaultValue, callback)
 end
 
 -- ===================================
--- TAB 1: ULTRA-FAST LOOTBOX ENGINE
+-- TAB 1: ZERO-DELAY PARALLEL BOX ENGINE
 -- ===================================
 local function buySpecificBoxInstant(boxName)
     local currentQubits = getLiveQubitNumber()
@@ -579,6 +602,7 @@ local function buySpecificBoxInstant(boxName)
                     boxRemote:FireServer(boxName)
                 end
                 Stats.BoxesOpened = Stats.BoxesOpened + 1
+                CardBadge.Text = "Boxes: " .. tostring(Stats.BoxesOpened)
             end)
         end)
         return true
@@ -586,23 +610,26 @@ local function buySpecificBoxInstant(boxName)
     return false
 end
 
--- Ultra-Fast Multi-Threaded Burst Loop
-task.spawn(function()
-    while true do
-        if Config.AutoOpenBoxMode ~= "None" then
-            local currentQubits = getLiveQubitNumber()
-            if currentQubits > 0 and currentQubits <= Config.BoxStopThreshold then
-                Config.AutoOpenBoxMode = "None"
-                task.wait(0.5)
+-- Parallel Burst Workers
+local NUM_WORKERS = 8
+for i = 1, NUM_WORKERS do
+    task.spawn(function()
+        while true do
+            if Config.AutoOpenBoxMode ~= "None" then
+                local currentQubits = getLiveQubitNumber()
+                if currentQubits > 0 and currentQubits <= Config.BoxStopThreshold then
+                    Config.AutoOpenBoxMode = "None"
+                    task.wait(0.2)
+                else
+                    buySpecificBoxInstant(Config.AutoOpenBoxMode)
+                    RunService.RenderStepped:Wait()
+                end
             else
-                buySpecificBoxInstant(Config.AutoOpenBoxMode)
-                task.wait(0.02) -- Maximum burst speed
+                task.wait(0.1)
             end
-        else
-            task.wait(0.1)
         end
-    end
-end)
+    end)
+end
 
 local function clickSidebarButton(sideName, buttonName)
     local side = playerGui:FindFirstChild("Side")
@@ -636,14 +663,14 @@ local function teleportTo(pos)
     end
 end
 
-createSectionHeader(LobbyPage, "🚀 Ultra-Fast Lootbox Openers")
+createSectionHeader(LobbyPage, "🚀 Zero-Delay Box Openers")
 createActionButton(LobbyPage, "📦 Buy 1x Classic Box (100 Q)", "Instant direct remote invocation", Color3.fromRGB(30, 45, 75), function() buySpecificBoxInstant("Classic Box") end)
 createActionButton(LobbyPage, "💎 Buy 1x Rare Box (500 Q)", "Instant direct remote invocation", Color3.fromRGB(30, 65, 80), function() buySpecificBoxInstant("Rare Box") end)
 createActionButton(LobbyPage, "👑 Buy 1x Diamond Box (2,500 Q)", "Instant direct remote invocation", Color3.fromRGB(75, 40, 85), function() buySpecificBoxInstant("Diamond Box") end)
 
-createToggle(LobbyPage, "⚡ Max-Speed Auto-Buy Classic", "Rapid zero-delay burst purchases", (Config.AutoOpenBoxMode == "Classic Box"), function(v) Config.AutoOpenBoxMode = v and "Classic Box" or "None" end)
-createToggle(LobbyPage, "⚡ Max-Speed Auto-Buy Rare", "Rapid zero-delay burst purchases", (Config.AutoOpenBoxMode == "Rare Box"), function(v) Config.AutoOpenBoxMode = v and "Rare Box" or "None" end)
-createToggle(LobbyPage, "⚡ Max-Speed Auto-Buy Diamond", "Rapid zero-delay burst purchases", (Config.AutoOpenBoxMode == "Diamond Box"), function(v) Config.AutoOpenBoxMode = v and "Diamond Box" or "None" end)
+createToggle(LobbyPage, "⚡ 1ms Parallel Burst: Classic", "Parallel multi-threaded purchase loop", (Config.AutoOpenBoxMode == "Classic Box"), function(v) Config.AutoOpenBoxMode = v and "Classic Box" or "None" end)
+createToggle(LobbyPage, "⚡ 1ms Parallel Burst: Rare", "Parallel multi-threaded purchase loop", (Config.AutoOpenBoxMode == "Rare Box"), function(v) Config.AutoOpenBoxMode = v and "Rare Box" or "None" end)
+createToggle(LobbyPage, "⚡ 1ms Parallel Burst: Diamond", "Parallel multi-threaded purchase loop", (Config.AutoOpenBoxMode == "Diamond Box"), function(v) Config.AutoOpenBoxMode = v and "Diamond Box" or "None" end)
 
 createInputRow(LobbyPage, "🛑 Stop Buying Balance Limit:", Config.BoxStopThreshold, function(val) Config.BoxStopThreshold = val end)
 
@@ -673,13 +700,12 @@ end)
 -- TAB 2: MATCH AI, DIFFICULTY & MOVEMENT
 -- ===================================
 createSectionHeader(MainPage, "⚡ Match Automation Core")
-createToggle(MainPage, "Auto Collect Shapes", "Jitter-free instant physical collection", Config.AutoFarm, function(v) Config.AutoFarm = v end)
+createToggle(MainPage, "Auto Collect Shapes", "Universal adaptive shape collector", Config.AutoFarm, function(v) Config.AutoFarm = v end)
 createToggle(MainPage, "🥚 Auto Collect Event Eggs", "Scans & grabs spawned eggs/nests across map", Config.AutoCollectEggs, function(v) Config.AutoCollectEggs = v end)
 createToggle(MainPage, "Auto Select Best Card", "Locks S+ multipliers (TimeSacrifice > Heavy > Moss > Golden > Shiny)", Config.AutoPickBestCard, function(v) Config.AutoPickBestCard = v end)
 createToggle(MainPage, "Auto Retry On Loss", "Restarts match immediately on defeat", Config.AutoRetry, function(v) Config.AutoRetry = v end)
 createToggle(MainPage, "Auto Claim Daily Quests", "Claims quest rewards in background", Config.AutoClaimQuests, function(v) Config.AutoClaimQuests = v end)
 
--- [[ MULTI-DIFFICULTY SELECTOR ]] --
 createSectionHeader(MainPage, "🎯 Difficulty Auto-Vote Selector")
 createToggle(MainPage, "Auto Vote Difficulty", "Automatically votes your chosen difficulty on match start", Config.AutoVoteDifficulty, function(v) Config.AutoVoteDifficulty = v end)
 
@@ -804,7 +830,7 @@ createActionButton(CreditsPage, "🔄 Reload Configuration", "Reloads saved conf
 end)
 
 createSectionHeader(CreditsPage, "⭐ Release & Repository Info")
-createCreditCard("Quantify Pro Hub (Apex V10.0)", "Complete Universal Match, Difficulty & Config Suite", Colors.Accent)
+createCreditCard("Quantify Pro Hub (Apex V11.0)", "Complete Universal Multi-Map Match Engine", Colors.Accent)
 createCreditCard("Developer", "Created by OL3N for Quantify", Colors.AccentGold)
 createCreditCard("GitHub Script URL", "raw.githubusercontent.com/OL3NNNNNN/quantifyyyyy", Colors.AccentCyan)
 createCreditCard("Universal Compatibility", "Works on Medium, Macsploit & UNC Executors", Colors.AccentGreen)
@@ -1112,7 +1138,7 @@ local function autoClaimQuests()
     end)
 end
 
--- 5. Shape Collector Target Finder
+-- 5. Universal Dynamic Shape Collector
 local function getActiveShape()
     if not Config.AutoFarm then return nil end
 
@@ -1138,8 +1164,8 @@ local function getActiveShape()
     local map = workspace:FindFirstChild("Map")
     if map then
         for _, item in ipairs(map:GetChildren()) do
-            if item:IsA("BasePart") and item.Name ~= "PartSpawn" and item.Name ~= "Terrain" then
-                if (item.Position - spawnPos).Magnitude < 45 then
+            if item:IsA("BasePart") and item.Name ~= "PartSpawn" and item.Name ~= "Terrain" and item.Name ~= "SpawnLocation" then
+                if (item.Position - currentArenaAnchor).Magnitude < 120 then
                     return item
                 end
             end
@@ -1149,7 +1175,7 @@ local function getActiveShape()
     return nil
 end
 
--- 6. Main Automation Loop
+-- 6. Main Automation Loop (Dynamic Target Detection)
 task.spawn(function()
     while task.wait(0.05) do
         if Config.AutoCollectEggs then
@@ -1157,14 +1183,23 @@ task.spawn(function()
             if egg then
                 currentDestination = egg.Position + Vector3.new(0, 1, 0)
                 Stats.EggsCollected = Stats.EggsCollected + 1
-                CardBadge.Text = "Eggs: " .. tostring(Stats.EggsCollected)
             elseif Config.AutoFarm then
                 local target = getActiveShape()
-                currentDestination = target and (target.Position + Vector3.new(0, 0.5, 0)) or spawnPos
+                if target then
+                    currentDestination = target.Position + Vector3.new(0, 0.5, 0)
+                else
+                    -- Safely remain at current arena anchor
+                    currentDestination = currentArenaAnchor
+                end
             end
         elseif Config.AutoFarm then
             local target = getActiveShape()
-            currentDestination = target and (target.Position + Vector3.new(0, 0.5, 0)) or spawnPos
+            if target then
+                currentDestination = target.Position + Vector3.new(0, 0.5, 0)
+            else
+                -- Safely remain at current arena anchor
+                currentDestination = currentArenaAnchor
+            end
         end
         
         autoVoteDifficulty()
