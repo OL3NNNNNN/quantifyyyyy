@@ -1,4 +1,4 @@
--- [[ QUANTIFY PRO HUB - APEX V23.0 ANTI-FALL BUILDER & MATCH SUITE ]] --
+-- [[ QUANTIFY PRO HUB - APEX V24.0 ULTRA-RELIABLE SHAPE COLLECTOR ]] --
 -- Source: https://raw.githubusercontent.com/OL3NNNNNN/quantifyyyyy/refs/heads/main/Quantify.lua
 
 local RAW_URL = "https://raw.githubusercontent.com/OL3NNNNNN/quantifyyyyy/refs/heads/main/Quantify.lua"
@@ -48,7 +48,6 @@ local function getSafeGuiParent()
 end
 
 local guiParent = getSafeGuiParent()
-local PLACE_ID = 73648930852061
 local CONFIG_FILE = "QuantifyProConfig.json"
 
 -- [[ CONFIG STATE & PERSISTENCE ]] --
@@ -61,7 +60,7 @@ local Config = {
     AutoRetry = true,
     AutoClaimQuests = true,
     
-    -- Auto-Builder Feature (Safe Mode)
+    -- Auto-Builder Feature (Safe Offset Mode)
     AutoBuildStack = false,
     
     -- Movement & Utilities
@@ -263,7 +262,7 @@ Title.Size = UDim2.new(1, -120, 1, 0)
 Title.Position = UDim2.new(0, 50, 0, 0)
 Title.BackgroundTransparency = 1
 Title.Font = Enum.Font.GothamBold
-Title.Text = "QUANTIFY <font color='#6366F1'>PRO</font> <font color='#38BDF8'>V23</font>"
+Title.Text = "QUANTIFY <font color='#6366F1'>PRO</font> <font color='#38BDF8'>V24</font>"
 Title.RichText = true
 Title.TextColor3 = Colors.TextPrimary
 Title.TextSize = 14
@@ -686,7 +685,7 @@ end)
 -- TAB 2: MATCH AI, DIFFICULTY & AUTO-BUILDER
 -- ===================================
 createSectionHeader(MainPage, "⚡ Match Automation Core")
-createToggle(MainPage, "Auto Collect Shapes", "Only touches active shapes on conveyors", Config.AutoFarm, function(v) Config.AutoFarm = v end)
+createToggle(MainPage, "Auto Collect Shapes", "Instantly touches and collects active shapes", Config.AutoFarm, function(v) Config.AutoFarm = v end)
 createToggle(MainPage, "🏗️ Auto-Build Machines (Cheapest First)", "Buys cheapest droppers & upgraders and places safely", Config.AutoBuildStack, function(v) Config.AutoBuildStack = v end)
 createToggle(MainPage, "🥚 Auto Collect Event Eggs", "Background remote claim & proximity collection", Config.AutoCollectEggs, function(v) Config.AutoCollectEggs = v end)
 createToggle(MainPage, "Auto Select Best Card", "Ranks Red, Gold, Emerald & Multiplier Cards", Config.AutoPickBestCard, function(v) Config.AutoPickBestCard = v end)
@@ -817,7 +816,7 @@ createActionButton(CreditsPage, "🔄 Reload Configuration", "Reloads saved conf
 end)
 
 createSectionHeader(CreditsPage, "⭐ Release & Repository Info")
-createCreditCard("Quantify Pro Hub (Apex V23.0)", "Complete Anti-Fall & Safe Placement Suite", Colors.Accent)
+createCreditCard("Quantify Pro Hub (Apex V24.0)", "Complete Shape Harvester Suite", Colors.Accent)
 createCreditCard("Developer", "Created by OL3N for Quantify", Colors.AccentGold)
 createCreditCard("GitHub Script URL", "raw.githubusercontent.com/OL3NNNNNN/quantifyyyyy", Colors.AccentCyan)
 createCreditCard("Universal Compatibility", "Works on Medium, Macsploit & UNC Executors", Colors.AccentGreen)
@@ -883,7 +882,7 @@ end)
 -- Helper: Check if in Voting / Intermission Phase
 local function isVotingPhaseActive()
     for _, gui in ipairs(playerGui:GetDescendants()) do
-        if gui:IsA("TextLabel") and gui.Visible then
+        if (gui:IsA("TextLabel") or gui:IsA("TextButton")) and gui.Visible then
             local t = string.lower(gui.Text)
             if t:find("vote for a difficulty") or t:find("voting") then
                 return true
@@ -906,7 +905,6 @@ local function autoBuildCheapestFirst()
     local placeRemote = getRemote("PlaceBuilding") or getRemote("Place") or getRemote("Build") or getRemote("PlaceItem")
     local candidates = {}
 
-    -- Scan for shop buttons with prices
     for _, gui in ipairs(playerGui:GetDescendants()) do
         if (gui:IsA("TextButton") or gui:IsA("ImageButton")) and gui.Visible then
             local itemName = gui.Name
@@ -939,18 +937,15 @@ local function autoBuildCheapestFirst()
         end
     end
 
-    -- Sort cheapest first
     table.sort(candidates, function(a, b)
         return a.Price < b.Price
     end)
 
-    -- Purchase and place safely to the side (prevents clipping through floor)
     if #candidates > 0 then
         local chosen = candidates[1]
         placedUpgradersRegistry[chosen.Name] = true
         triggerButton(chosen.Button)
 
-        -- Offset safely from character torso to avoid physics explosion
         local safeTargetCFrame = CFrame.new(humanoidRootPart.Position + Vector3.new(buildXOffset, 0, 0))
         buildXOffset = buildXOffset + 3.0
 
@@ -1214,29 +1209,34 @@ local function autoClaimQuests()
     end)
 end
 
--- 5. Shape Collector Target Finder (Strict Conveyor Drops ONLY)
+-- 5. Shape Collector Target Finder (Universal Conveyor & Drop Harvester)
 local function getActiveShape()
-    if not Config.AutoFarm or isVotingPhaseActive() then return nil end
+    if not Config.AutoFarm then return nil end
 
-    local foldersToCheck = {
+    local primaryFolders = {
         workspace:FindFirstChild("Parts"),
         workspace:FindFirstChild("Shapesother"),
         workspace:FindFirstChild("ChudParts"),
         workspace:FindFirstChild("Shapes")
     }
 
-    for _, folder in ipairs(foldersToCheck) do
-        if folder and folder ~= workspace:FindFirstChild("Map") then
+    for _, folder in ipairs(primaryFolders) do
+        if folder then
             for _, item in ipairs(folder:GetChildren()) do
-                if not item:IsDescendantOf(workspace:FindFirstChild("Map") or folder) or folder.Name ~= "Map" then
-                    if item:IsA("BasePart") and item.Transparency < 0.95 then
-                        return item
-                    elseif item:IsA("Model") and not item.Name:find("Nest") and not item.Name:find("Building") then
-                        local part = item.PrimaryPart or item:FindFirstChildWhichIsA("BasePart")
-                        if part and part.Transparency < 0.95 then return part end
-                    end
+                if item:IsA("BasePart") and item.Transparency < 0.95 then
+                    return item
+                elseif item:IsA("Model") and not item.Name:find("Nest") and not item.Name:find("Building") then
+                    local part = item.PrimaryPart or item:FindFirstChildWhichIsA("BasePart")
+                    if part and part.Transparency < 0.95 then return part end
                 end
             end
+        end
+    end
+
+    -- Fallback: Scan root workspace parts with shape properties
+    for _, item in ipairs(workspace:GetChildren()) do
+        if item:IsA("BasePart") and item.Transparency < 0.95 and not item.Anchored and item.Name ~= "Terrain" then
+            return item
         end
     end
 
@@ -1245,13 +1245,19 @@ end
 
 -- 6. Main Automation Loop
 task.spawn(function()
-    while task.wait(0.05) do
+    while task.wait(0.03) do
         local newTarget = nil
         
-        if Config.AutoFarm and not isVotingPhaseActive() then
+        if Config.AutoFarm then
             local shape = getActiveShape()
             if shape then
                 newTarget = shape.Position + Vector3.new(0, 0.4, 0)
+                
+                -- Instant Touch Interest Simulation
+                if humanoidRootPart and typeof(firetouchinterest) == "function" then
+                    firetouchinterest(humanoidRootPart, shape, 0)
+                    firetouchinterest(humanoidRootPart, shape, 1)
+                end
             end
         end
 
@@ -1275,7 +1281,7 @@ end)
 
 -- 8. Target-Only Physics Lock
 RunService.Heartbeat:Connect(function()
-    if not Config.AutoFarm or isVotingPhaseActive() or game.PlaceId ~= PLACE_ID then return end
+    if not Config.AutoFarm then return end
 
     if activeTargetPosition and humanoidRootPart and humanoid and humanoid.Health > 0 then
         humanoidRootPart.CFrame = CFrame.new(activeTargetPosition)
