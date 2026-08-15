@@ -1,4 +1,4 @@
--- [[ QUANTIFY PRO HUB - APEX V20.0 TRUE TARGETED COLLECTOR ]] --
+-- [[ QUANTIFY PRO HUB - APEX V21.0 DUAL-LAYER DIFFICULTY VOTER ]] --
 -- Source: https://raw.githubusercontent.com/OL3NNNNNN/quantifyyyyy/refs/heads/main/Quantify.lua
 
 local RAW_URL = "https://raw.githubusercontent.com/OL3NNNNNN/quantifyyyyy/refs/heads/main/Quantify.lua"
@@ -54,7 +54,7 @@ local CONFIG_FILE = "QuantifyProConfig.json"
 -- [[ CONFIG STATE & PERSISTENCE ]] --
 local Config = {
     AutoFarm = true,
-    AutoCollectEggs = false, -- Default false so it never interferes
+    AutoCollectEggs = false,
     AutoVoteDifficulty = true,
     SelectedDifficulty = "Insane",
     AutoPickBestCard = true,
@@ -263,7 +263,7 @@ Title.Size = UDim2.new(1, -120, 1, 0)
 Title.Position = UDim2.new(0, 50, 0, 0)
 Title.BackgroundTransparency = 1
 Title.Font = Enum.Font.GothamBold
-Title.Text = "QUANTIFY <font color='#6366F1'>PRO</font> <font color='#38BDF8'>V20</font>"
+Title.Text = "QUANTIFY <font color='#6366F1'>PRO</font> <font color='#38BDF8'>V21</font>"
 Title.RichText = true
 Title.TextColor3 = Colors.TextPrimary
 Title.TextSize = 14
@@ -817,7 +817,7 @@ createActionButton(CreditsPage, "🔄 Reload Configuration", "Reloads saved conf
 end)
 
 createSectionHeader(CreditsPage, "⭐ Release & Repository Info")
-createCreditCard("Quantify Pro Hub (Apex V20.0)", "Complete Target-Locked Match Engine", Colors.Accent)
+createCreditCard("Quantify Pro Hub (Apex V21.0)", "Complete Dual-Layer Voter Suite", Colors.Accent)
 createCreditCard("Developer", "Created by OL3N for Quantify", Colors.AccentGold)
 createCreditCard("GitHub Script URL", "raw.githubusercontent.com/OL3NNNNNN/quantifyyyyy", Colors.AccentCyan)
 createCreditCard("Universal Compatibility", "Works on Medium, Macsploit & UNC Executors", Colors.AccentGreen)
@@ -1087,20 +1087,35 @@ local function autoPickBestCard()
     end
 end
 
--- 2. Auto Vote Selected Difficulty
+-- 2. Dual-Layer Auto-Vote Difficulty (Remote + GUI Auto-Click)
 local lastVote = 0
 local function autoVoteDifficulty()
     if not Config.AutoVoteDifficulty then return end
     local now = tick()
-    if now - lastVote >= 1.0 then
-        lastVote = now
-        local diffRemote = getRemote("Difficulty")
-        if diffRemote then
-            task.spawn(function()
-                pcall(function()
-                    diffRemote:InvokeServer(Config.SelectedDifficulty)
-                end)
-            end)
+    if now - lastVote < 0.8 then return end
+    lastVote = now
+
+    -- Method A: Direct Remote Invocations
+    local diffRemote = getRemote("Difficulty")
+    if diffRemote then
+        task.spawn(function()
+            pcall(function() diffRemote:InvokeServer("vote", Config.SelectedDifficulty) end)
+            pcall(function() diffRemote:InvokeServer(Config.SelectedDifficulty) end)
+            pcall(function() diffRemote:FireServer("vote", Config.SelectedDifficulty) end)
+            pcall(function() diffRemote:FireServer(Config.SelectedDifficulty) end)
+        end)
+    end
+
+    -- Method B: Screen GUI Voting Frame Clicker
+    for _, gui in ipairs(playerGui:GetDescendants()) do
+        if (gui:IsA("TextButton") or gui:IsA("ImageButton")) and gui.Visible then
+            local n = string.lower(gui.Name)
+            local t = gui:IsA("TextButton") and string.lower(gui.Text) or ""
+            local targetName = string.lower(Config.SelectedDifficulty)
+
+            if n == targetName or t == targetName or n:find(targetName) or t:find(targetName) then
+                triggerButton(gui)
+            end
         end
     end
 end
@@ -1161,11 +1176,10 @@ local function autoClaimQuests()
     end)
 end
 
--- 5. Shape Collector Target Finder (Strict Non-Map Dropped Shapes ONLY)
+-- 5. Shape Collector Target Finder (Strict Conveyor Drops ONLY)
 local function getActiveShape()
     if not Config.AutoFarm then return nil end
 
-    -- Only check dedicated shape drop containers
     local foldersToCheck = {
         workspace:FindFirstChild("Parts"),
         workspace:FindFirstChild("Shapesother"),
@@ -1176,7 +1190,6 @@ local function getActiveShape()
     for _, folder in ipairs(foldersToCheck) do
         if folder and folder ~= workspace:FindFirstChild("Map") then
             for _, item in ipairs(folder:GetChildren()) do
-                -- Exclude static map architecture or nest models
                 if not item:IsDescendantOf(workspace:FindFirstChild("Map") or folder) or folder.Name ~= "Map" then
                     if item:IsA("BasePart") and item.Transparency < 0.95 then
                         return item
