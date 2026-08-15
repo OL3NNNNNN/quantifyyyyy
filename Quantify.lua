@@ -1,4 +1,4 @@
--- [[ Quantify Pro Hub - Complete 3-Tab Suite ]] --
+-- [[ Quantify Pro Hub - Universal Suite with Direct Box Remotes ]] --
 -- Source: https://raw.githubusercontent.com/OL3NNNNNN/quantifyyyyy/refs/heads/main/Quantify.lua
 
 local RAW_URL = "https://raw.githubusercontent.com/OL3NNNNNN/quantifyyyyy/refs/heads/main/Quantify.lua"
@@ -59,16 +59,33 @@ local function getRemote(name)
     return nil
 end
 
+-- Button Trigger Helper
+local function triggerButton(btn)
+    if not btn then return end
+    if typeof(firesignal) == "function" then
+        firesignal(btn.Activated)
+        firesignal(btn.MouseButton1Click)
+        firesignal(btn.MouseButton1Down)
+        firesignal(btn.MouseButton1Up)
+    elseif typeof(getconnections) == "function" then
+        for _, conn in pairs(getconnections(btn.Activated)) do conn:Fire() end
+        for _, conn in pairs(getconnections(btn.MouseButton1Click)) do conn:Fire() end
+    end
+end
+
 -- Config State
 local Config = {
     AutoFarm = true,
     AutoVoteInsane = true,
     AutoRetry = true,
     AutoClaimQuests = true,
+    AutoOpenBoxMode = "None", -- "Classic Box", "Rare Box", "Diamond Box", or "None"
+    FastSkipBox = true
 }
 
 local Stats = {
-    RetriesHandled = 0
+    RetriesHandled = 0,
+    BoxesOpened = 0
 }
 
 -- Character & Physics State
@@ -115,6 +132,25 @@ local function getLiveQubits()
     return "0"
 end
 
+-- [[ DIRECT BOX OPENER VIA BUILDINGBOX REMOTE ]] --
+local function buySpecificBox(boxName)
+    local boxRemote = getRemote("BuildingBox") or getRemote("BuildingBoxes")
+    if boxRemote then
+        task.spawn(function()
+            pcall(function()
+                if boxRemote:IsA("RemoteFunction") then
+                    boxRemote:InvokeServer(boxName)
+                else
+                    boxRemote:FireServer(boxName)
+                end
+                Stats.BoxesOpened = Stats.BoxesOpened + 1
+            end)
+        end)
+        return true
+    end
+    return false
+end
+
 -- [[ MODERN GLASSMORPHIC UI ]] --
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "QuantifyHubUI"
@@ -125,8 +161,8 @@ if getgenv then getgenv().QuantifyHubUI = ScreenGui end
 
 local MainFrame = Instance.new("Frame")
 MainFrame.Name = "MainFrame"
-MainFrame.Size = UDim2.new(0, 330, 0, 430)
-MainFrame.Position = UDim2.new(0.04, 0, 0.2, 0)
+MainFrame.Size = UDim2.new(0, 330, 0, 460)
+MainFrame.Position = UDim2.new(0.04, 0, 0.18, 0)
 MainFrame.BackgroundColor3 = Color3.fromRGB(15, 17, 23)
 MainFrame.BorderSizePixel = 0
 MainFrame.Active = true
@@ -255,7 +291,7 @@ createTab("1. Lobby", 1, LobbyPage)
 createTab("2. Main Game", 2, MainPage)
 createTab("3. Credits", 3, CreditsPage)
 
--- [[ UI COMPONENT HELPERS ]] --
+-- [[ UI BUILDERS ]] --
 local function createToggle(parent, text, defaultState, callback)
     local row = Instance.new("Frame", parent)
     row.Size = UDim2.new(1, 0, 0, 34)
@@ -316,35 +352,70 @@ local function createActionButton(parent, text, color, callback)
 end
 
 -- ==========================
--- TAB 1: LOBBY
+-- TAB 1: LOBBY SUITE
 -- ==========================
-local function toggleHudFrame(frameName)
+local function clickSidebarButton(sideName, buttonName)
+    local side = playerGui:FindFirstChild("Side")
+    if side then
+        local section = side:FindFirstChild(sideName)
+        if section then
+            local holder = section:FindFirstChild(buttonName)
+            if holder then
+                local btn = holder:FindFirstChildWhichIsA("GuiButton")
+                if btn then
+                    triggerButton(btn)
+                    return
+                end
+            end
+        end
+    end
+
     local hud = playerGui:FindFirstChild("HUD")
     if hud then
-        local frame = hud:FindFirstChild(frameName)
+        local frame = hud:FindFirstChild(buttonName)
         if frame then frame.Visible = not frame.Visible end
     end
 end
 
-createActionButton(LobbyPage, "🛒 Open Building Shop", Color3.fromRGB(45, 75, 120), function() toggleHudFrame("BuildingShop") end)
-createActionButton(LobbyPage, "🎁 Open Daily Rewards", Color3.fromRGB(45, 110, 85), function() toggleHudFrame("DailyRewards") end)
-createActionButton(LobbyPage, "📦 Open Roll Box / Boxes", Color3.fromRGB(110, 60, 120), function() toggleHudFrame("RollBox") end)
-createActionButton(LobbyPage, "🎡 Open Lucky Wheel", Color3.fromRGB(130, 85, 30), function()
-    local wheel = playerGui:FindFirstChild("Wheel")
-    if wheel then wheel.Enabled = not wheel.Enabled end
-end)
-createActionButton(LobbyPage, "🌲 Open Skill Tree", Color3.fromRGB(50, 95, 90), function()
-    local tree = playerGui:FindFirstChild("SkillTree")
-    if tree then tree.Enabled = not tree.Enabled end
-end)
-createActionButton(LobbyPage, "🚪 Auto Teleport to Match Door", Color3.fromRGB(140, 50, 50), function()
-    local doors = workspace:FindFirstChild("Lobby") and workspace.Lobby:FindFirstChild("Doors")
-    if doors and humanoidRootPart then
-        local targetDoor = doors:FindFirstChildWhichIsA("BasePart") or doors:GetDescendants()[1]
-        if targetDoor and targetDoor:IsA("BasePart") then
-            humanoidRootPart.CFrame = targetDoor.CFrame + Vector3.new(0, 3, 0)
-        end
+local function teleportTo(pos)
+    local char = player.Character
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    if root then
+        root.CFrame = CFrame.new(pos)
+        root.AssemblyLinearVelocity = Vector3.zero
     end
+end
+
+-- 1-Click Direct Box Purchases
+createActionButton(LobbyPage, "📦 Buy Classic Box (100 Q)", Color3.fromRGB(45, 80, 130), function() buySpecificBox("Classic Box") end)
+createActionButton(LobbyPage, "💎 Buy Rare Box (500 Q)", Color3.fromRGB(60, 110, 130), function() buySpecificBox("Rare Box") end)
+createActionButton(LobbyPage, "👑 Buy Diamond Box (2500 Q)", Color3.fromRGB(120, 60, 130), function() buySpecificBox("Diamond Box") end)
+
+-- Auto Loop Box Openers
+createToggle(LobbyPage, "🔄 Auto-Buy Classic Boxes", (Config.AutoOpenBoxMode == "Classic Box"), function(v) Config.AutoOpenBoxMode = v and "Classic Box" or "None" end)
+createToggle(LobbyPage, "🔄 Auto-Buy Rare Boxes", (Config.AutoOpenBoxMode == "Rare Box"), function(v) Config.AutoOpenBoxMode = v and "Rare Box" or "None" end)
+createToggle(LobbyPage, "🔄 Auto-Buy Diamond Boxes", (Config.AutoOpenBoxMode == "Diamond Box"), function(v) Config.AutoOpenBoxMode = v and "Diamond Box" or "None" end)
+
+-- Lobby Teleports & Menus
+createActionButton(LobbyPage, "🚪 Teleport to Match Door", Color3.fromRGB(140, 50, 50), function()
+    local door = workspace:FindFirstChild("Teleporters") and workspace.Teleporters:FindFirstChild("1") and workspace.Teleporters["1"]:FindFirstChild("FrontDoor")
+    if door then
+        teleportTo(door.Position + Vector3.new(0, 2, 0))
+    else
+        teleportTo(Vector3.new(204.2, 12.5, -27.8))
+    end
+end)
+
+createActionButton(LobbyPage, "🎁 Claim Free Group Chest", Color3.fromRGB(50, 110, 80), function()
+    teleportTo(Vector3.new(191.1, 5.5, 18.4))
+end)
+
+createActionButton(LobbyPage, "🛒 Open Building Shop", Color3.fromRGB(45, 75, 120), function()
+    clickSidebarButton("Left", "BuildingShop")
+end)
+
+createActionButton(LobbyPage, "🎁 Open Daily Rewards", Color3.fromRGB(45, 110, 85), function()
+    clickSidebarButton("Right", "DailyRewards")
 end)
 
 -- ==========================
@@ -419,7 +490,7 @@ local function createCreditCard(title, desc)
     d.TextXAlignment = Enum.TextXAlignment.Left
 end
 
-createCreditCard("Quantify Pro Hub", "Version 2.6 Release (Universal & Lobby Support)")
+createCreditCard("Quantify Pro Hub", "Version 4.0 (Direct Remote Engine)")
 createCreditCard("Author / Developer", "Created by OL3N for Quantify")
 createCreditCard("GitHub Repository", "raw.githubusercontent.com/OL3NNNNNN/quantifyyyyy")
 createCreditCard("Supported Environment", "Fully compatible with Medium & Standard UNC")
@@ -430,14 +501,25 @@ MinBtn.MouseButton1Click:Connect(function()
     isMinimized = not isMinimized
     ScrollContent.Visible = not isMinimized
     TabBar.Visible = not isMinimized
-    local newSize = isMinimized and UDim2.new(0, 330, 0, 42) or UDim2.new(0, 330, 0, 430)
+    local newSize = isMinimized and UDim2.new(0, 330, 0, 42) or UDim2.new(0, 330, 0, 460)
     TweenService:Create(MainFrame, TweenInfo.new(0.2, Enum.EasingStyle.Quad), {Size = newSize}):Play()
     MinBtn.Text = isMinimized and "+" or "-"
 end)
 
 -- [[ AUTOMATION CORE ]] --
 
--- 1. Auto Vote Insane
+-- 1. Auto Box Roll Execution Loop
+local lastAutoBox = 0
+local function autoRollSelectedBoxes()
+    if Config.AutoOpenBoxMode == "None" then return end
+    local now = tick()
+    if now - lastAutoBox < 0.6 then return end
+    lastAutoBox = now
+
+    buySpecificBox(Config.AutoOpenBoxMode)
+end
+
+-- 2. Auto Vote Insane
 local lastVote = 0
 local function autoVoteInsane()
     if not Config.AutoVoteInsane then return end
@@ -455,7 +537,7 @@ local function autoVoteInsane()
     end
 end
 
--- 2. Auto Retry
+-- 3. Auto Retry
 local lastRetry = 0
 local function autoRetry()
     if not Config.AutoRetry then return end
@@ -487,7 +569,7 @@ local function autoRetry()
     end
 end
 
--- 3. Auto Claim Daily Quests
+-- 4. Auto Claim Daily Quests
 local lastQuestClaim = 0
 local function autoClaimQuests()
     if not Config.AutoClaimQuests then return end
@@ -509,7 +591,7 @@ local function autoClaimQuests()
     end)
 end
 
--- 4. Shape Target Finder
+-- 5. Shape Target Finder
 local function getActiveShape()
     if not Config.AutoFarm then return nil end
 
@@ -546,7 +628,7 @@ local function getActiveShape()
     return nil
 end
 
--- 5. Main Automation & Qubit Monitor Loop
+-- 6. Main Automation Loop
 task.spawn(function()
     while task.wait(0.05) do
         if Config.AutoFarm then
@@ -556,6 +638,7 @@ task.spawn(function()
         autoVoteInsane()
         autoRetry()
         autoClaimQuests()
+        autoRollSelectedBoxes()
     end
 end)
 
@@ -567,7 +650,7 @@ task.spawn(function()
     end
 end)
 
--- 6. Jitter-Free Physics Lock (Heartbeat Sync)
+-- 7. Jitter-Free Physics Lock (Heartbeat Sync)
 RunService.Heartbeat:Connect(function()
     if not Config.AutoFarm or game.PlaceId ~= PLACE_ID then return end
 
