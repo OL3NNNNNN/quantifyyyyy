@@ -1,4 +1,4 @@
--- [[ QUANTIFY PRO HUB - APEX V11.0 DYNAMIC MAP FIX ]] --
+-- [[ QUANTIFY PRO HUB - APEX V15.0 COLOR & GEM CARD AI ]] --
 -- Source: https://raw.githubusercontent.com/OL3NNNNNN/quantifyyyyy/refs/heads/main/Quantify.lua
 
 local RAW_URL = "https://raw.githubusercontent.com/OL3NNNNNN/quantifyyyyy/refs/heads/main/Quantify.lua"
@@ -112,32 +112,13 @@ local Stats = {
 local character = player.Character or player.CharacterAdded:Wait()
 local humanoidRootPart = character:WaitForChild("HumanoidRootPart")
 local humanoid = character:WaitForChild("Humanoid")
-
--- Dynamic Arena Anchor
-local currentArenaAnchor = humanoidRootPart.Position
-local currentDestination = currentArenaAnchor
-
-local function updateArenaAnchor()
-    local map = workspace:FindFirstChild("Map")
-    if map then
-        local spawnPart = map:FindFirstChild("PartSpawn") or map:FindFirstChild("SpawnLocation") or map:FindFirstChildWhichIsA("SpawnLocation")
-        if spawnPart and spawnPart:IsA("BasePart") then
-            currentArenaAnchor = spawnPart.Position + Vector3.new(0, 3, 0)
-            return
-        end
-    end
-    if humanoidRootPart then
-        currentArenaAnchor = humanoidRootPart.Position
-    end
-end
+local activeTargetPosition = nil
 
 player.CharacterAdded:Connect(function(newChar)
     character = newChar
     humanoidRootPart = newChar:WaitForChild("HumanoidRootPart")
     humanoid = newChar:WaitForChild("Humanoid")
-    task.wait(0.5)
-    updateArenaAnchor()
-    currentDestination = currentArenaAnchor
+    activeTargetPosition = nil
     
     if Config.SpeedBoost and humanoid then
         humanoid.WalkSpeed = Config.SpeedValue
@@ -276,7 +257,7 @@ Title.Size = UDim2.new(1, -120, 1, 0)
 Title.Position = UDim2.new(0, 50, 0, 0)
 Title.BackgroundTransparency = 1
 Title.Font = Enum.Font.GothamBold
-Title.Text = "QUANTIFY <font color='#6366F1'>PRO</font> <font color='#38BDF8'>V11</font>"
+Title.Text = "QUANTIFY <font color='#6366F1'>PRO</font> <font color='#38BDF8'>V15</font>"
 Title.RichText = true
 Title.TextColor3 = Colors.TextPrimary
 Title.TextSize = 14
@@ -338,7 +319,7 @@ CardBadge.Size = UDim2.new(0.42, 0, 1, 0)
 CardBadge.Position = UDim2.new(0.58, 0, 0, 0)
 CardBadge.BackgroundTransparency = 1
 CardBadge.Font = Enum.Font.GothamMedium
-CardBadge.Text = "Boxes: 0"
+CardBadge.Text = "Card: Ready"
 CardBadge.TextColor3 = Colors.AccentGold
 CardBadge.TextSize = 10
 CardBadge.TextXAlignment = Enum.TextXAlignment.Right
@@ -583,7 +564,7 @@ local function createInputRow(parent, labelText, defaultValue, callback)
 end
 
 -- ===================================
--- TAB 1: ZERO-DELAY PARALLEL BOX ENGINE
+-- TAB 1: ZERO-DELAY LOOTBOX ENGINE
 -- ===================================
 local function buySpecificBoxInstant(boxName)
     local currentQubits = getLiveQubitNumber()
@@ -602,7 +583,6 @@ local function buySpecificBoxInstant(boxName)
                     boxRemote:FireServer(boxName)
                 end
                 Stats.BoxesOpened = Stats.BoxesOpened + 1
-                CardBadge.Text = "Boxes: " .. tostring(Stats.BoxesOpened)
             end)
         end)
         return true
@@ -610,7 +590,7 @@ local function buySpecificBoxInstant(boxName)
     return false
 end
 
--- Parallel Burst Workers
+-- Burst Loop
 local NUM_WORKERS = 8
 for i = 1, NUM_WORKERS do
     task.spawn(function()
@@ -668,9 +648,9 @@ createActionButton(LobbyPage, "📦 Buy 1x Classic Box (100 Q)", "Instant direct
 createActionButton(LobbyPage, "💎 Buy 1x Rare Box (500 Q)", "Instant direct remote invocation", Color3.fromRGB(30, 65, 80), function() buySpecificBoxInstant("Rare Box") end)
 createActionButton(LobbyPage, "👑 Buy 1x Diamond Box (2,500 Q)", "Instant direct remote invocation", Color3.fromRGB(75, 40, 85), function() buySpecificBoxInstant("Diamond Box") end)
 
-createToggle(LobbyPage, "⚡ 1ms Parallel Burst: Classic", "Parallel multi-threaded purchase loop", (Config.AutoOpenBoxMode == "Classic Box"), function(v) Config.AutoOpenBoxMode = v and "Classic Box" or "None" end)
-createToggle(LobbyPage, "⚡ 1ms Parallel Burst: Rare", "Parallel multi-threaded purchase loop", (Config.AutoOpenBoxMode == "Rare Box"), function(v) Config.AutoOpenBoxMode = v and "Rare Box" or "None" end)
-createToggle(LobbyPage, "⚡ 1ms Parallel Burst: Diamond", "Parallel multi-threaded purchase loop", (Config.AutoOpenBoxMode == "Diamond Box"), function(v) Config.AutoOpenBoxMode = v and "Diamond Box" or "None" end)
+createToggle(LobbyPage, "⚡ Parallel Burst: Classic", "Rapid zero-delay purchase loop", (Config.AutoOpenBoxMode == "Classic Box"), function(v) Config.AutoOpenBoxMode = v and "Classic Box" or "None" end)
+createToggle(LobbyPage, "⚡ Parallel Burst: Rare", "Rapid zero-delay purchase loop", (Config.AutoOpenBoxMode == "Rare Box"), function(v) Config.AutoOpenBoxMode = v and "Rare Box" or "None" end)
+createToggle(LobbyPage, "⚡ Parallel Burst: Diamond", "Rapid zero-delay purchase loop", (Config.AutoOpenBoxMode == "Diamond Box"), function(v) Config.AutoOpenBoxMode = v and "Diamond Box" or "None" end)
 
 createInputRow(LobbyPage, "🛑 Stop Buying Balance Limit:", Config.BoxStopThreshold, function(val) Config.BoxStopThreshold = val end)
 
@@ -700,9 +680,9 @@ end)
 -- TAB 2: MATCH AI, DIFFICULTY & MOVEMENT
 -- ===================================
 createSectionHeader(MainPage, "⚡ Match Automation Core")
-createToggle(MainPage, "Auto Collect Shapes", "Universal adaptive shape collector", Config.AutoFarm, function(v) Config.AutoFarm = v end)
-createToggle(MainPage, "🥚 Auto Collect Event Eggs", "Scans & grabs spawned eggs/nests across map", Config.AutoCollectEggs, function(v) Config.AutoCollectEggs = v end)
-createToggle(MainPage, "Auto Select Best Card", "Locks S+ multipliers (TimeSacrifice > Heavy > Moss > Golden > Shiny)", Config.AutoPickBestCard, function(v) Config.AutoPickBestCard = v end)
+createToggle(MainPage, "Auto Collect Shapes", "Only touches active shapes on conveyors", Config.AutoFarm, function(v) Config.AutoFarm = v end)
+createToggle(MainPage, "🥚 Auto Collect Event Eggs", "Scans & grabs spawned nest eggs across map", Config.AutoCollectEggs, function(v) Config.AutoCollectEggs = v end)
+createToggle(MainPage, "Auto Select Best Card", "Ranks Red, Gold, Emerald & Multiplier Cards", Config.AutoPickBestCard, function(v) Config.AutoPickBestCard = v end)
 createToggle(MainPage, "Auto Retry On Loss", "Restarts match immediately on defeat", Config.AutoRetry, function(v) Config.AutoRetry = v end)
 createToggle(MainPage, "Auto Claim Daily Quests", "Claims quest rewards in background", Config.AutoClaimQuests, function(v) Config.AutoClaimQuests = v end)
 
@@ -830,7 +810,7 @@ createActionButton(CreditsPage, "🔄 Reload Configuration", "Reloads saved conf
 end)
 
 createSectionHeader(CreditsPage, "⭐ Release & Repository Info")
-createCreditCard("Quantify Pro Hub (Apex V11.0)", "Complete Universal Multi-Map Match Engine", Colors.Accent)
+createCreditCard("Quantify Pro Hub (Apex V15.0)", "Complete Color & Gem Evaluator Suite", Colors.Accent)
 createCreditCard("Developer", "Created by OL3N for Quantify", Colors.AccentGold)
 createCreditCard("GitHub Script URL", "raw.githubusercontent.com/OL3NNNNNN/quantifyyyyy", Colors.AccentCyan)
 createCreditCard("Universal Compatibility", "Works on Medium, Macsploit & UNC Executors", Colors.AccentGreen)
@@ -893,62 +873,41 @@ task.spawn(function()
     end
 end)
 
--- Shape & Egg ESP Loop
-task.spawn(function()
-    while task.wait(1.5) do
-        if Config.ShapeESP then
-            local targets = {
-                workspace:FindFirstChild("Parts"),
-                workspace:FindFirstChild("Shapesother"),
-                workspace:FindFirstChild("HatchingSlots")
-            }
-            for _, container in ipairs(targets) do
-                if container then
-                    for _, obj in ipairs(container:GetChildren()) do
-                        if (obj:IsA("BasePart") or obj:IsA("Model")) and not obj:FindFirstChild("ESPHighlight") then
-                            local hl = Instance.new("Highlight")
-                            hl.Name = "ESPHighlight"
-                            hl.FillColor = Colors.AccentCyan
-                            hl.OutlineColor = Colors.AccentGold
-                            hl.FillTransparency = 0.5
-                            hl.OutlineTransparency = 0.1
-                            hl.Parent = obj
+-- Dedicated Nest & Egg Hunter Core
+local function getActiveEgg()
+    if not Config.AutoCollectEggs then return nil end
+
+    local map = workspace:FindFirstChild("Map")
+    if not map then return nil end
+
+    for _, item in ipairs(map:GetChildren()) do
+        if item.Name == "Nest" and item:IsA("Model") then
+            local nestModel = item:FindFirstChild("NestModel")
+            if nestModel then
+                for _, folder in ipairs(nestModel:GetChildren()) do
+                    if folder:IsA("Folder") and folder.Name:find("ExampleCF") then
+                        for _, eggNum in ipairs(folder:GetChildren()) do
+                            local eggPart = eggNum:FindFirstChild("EggShadow") or eggNum:FindFirstChildWhichIsA("BasePart")
+                            if eggPart and eggPart:IsA("BasePart") then
+                                if humanoidRootPart and typeof(firetouchinterest) == "function" then
+                                    firetouchinterest(humanoidRootPart, eggPart, 0)
+                                    firetouchinterest(humanoidRootPart, eggPart, 1)
+                                end
+                                return eggPart
+                            end
                         end
                     end
                 end
             end
-        end
-    end
-end)
-
--- Auto Egg Finder
-local function getActiveEgg()
-    if not Config.AutoCollectEggs then return nil end
-
-    local eggContainers = {
-        workspace:FindFirstChild("Eggs"),
-        workspace:FindFirstChild("Nests"),
-        workspace:FindFirstChild("PetHome"),
-        workspace:FindFirstChild("Map")
-    }
-
-    for _, container in ipairs(eggContainers) do
-        if container then
-            for _, item in ipairs(container:GetDescendants()) do
-                if item:IsA("BasePart") and (string.lower(item.Name):find("egg") or string.lower(item.Name):find("nest")) then
-                    return item
-                elseif item:IsA("Model") and string.lower(item.Name):find("egg") then
-                    local part = item.PrimaryPart or item:FindFirstChildWhichIsA("BasePart")
-                    if part then return part end
+            
+            local basePart = item:FindFirstChild("Part") or item:FindFirstChildWhichIsA("BasePart")
+            if basePart and basePart:IsA("BasePart") then
+                if humanoidRootPart and typeof(firetouchinterest) == "function" then
+                    firetouchinterest(humanoidRootPart, basePart, 0)
+                    firetouchinterest(humanoidRootPart, basePart, 1)
                 end
+                return basePart
             end
-        end
-    end
-
-    for _, item in ipairs(workspace:GetChildren()) do
-        if item:IsA("Model") and string.lower(item.Name):find("egg") then
-            local p = item.PrimaryPart or item:FindFirstChildWhichIsA("BasePart")
-            if p then return p end
         end
     end
 
@@ -974,43 +933,73 @@ task.spawn(function()
     end
 end)
 
--- 1. Precision Card AI Rater
+-- [[ ADVANCED COLOR & MULTIPLIER CARD EVALUATOR ]] --
 local function rateCard(cardObj)
     local cardName = string.lower(cardObj.Name)
     local fullText = ""
     local displayName = cardObj.Name
+    local score = 10
 
-    for _, label in ipairs(cardObj:GetDescendants()) do
-        if label:IsA("TextLabel") and label.Visible then
-            fullText = fullText .. " " .. string.lower(label.Text)
-            if displayName == cardObj.Name and label.Text:len() > 1 then
-                displayName = label.Text
+    -- Extract Visual Border/Background Colors
+    for _, elem in ipairs(cardObj:GetDescendants()) do
+        if elem:IsA("GuiObject") and elem.Visible then
+            local c = elem.BackgroundColor3
+            local stroke = elem:FindFirstChildWhichIsA("UIStroke")
+            if stroke then c = stroke.Color end
+            
+            -- Red / Crimson Card (God/Mythic Tier)
+            if (c.R > 0.7 and c.G < 0.3 and c.B < 0.3) or (c.R > 0.8 and c.G < 0.4) then
+                score = score + 1000
+            -- Gold / Amber Card (Legendary Tier)
+            elseif (c.R > 0.75 and c.G > 0.6 and c.B < 0.3) then
+                score = score + 850
+            -- Emerald / Green Card (Gem Tier)
+            elseif (c.G > 0.7 and c.R < 0.4 and c.B < 0.5) then
+                score = score + 750
+            -- Purple / Void Card
+            elseif (c.R > 0.5 and c.B > 0.6 and c.G < 0.4) then
+                score = score + 700
+            end
+        end
+
+        if elem:IsA("TextLabel") and elem.Visible then
+            fullText = fullText .. " " .. string.lower(elem.Text)
+            if displayName == cardObj.Name and elem.Text:len() > 1 then
+                displayName = elem.Text
             end
         end
     end
 
-    local score = 10
+    -- Tier 0: Gemstones & Mythics
+    if fullText:find("emerald") or cardName:find("emerald") then score = score + 950 end
+    if fullText:find("ruby") or cardName:find("ruby") then score = score + 950 end
+    if fullText:find("sapphire") or cardName:find("sapphire") then score = score + 900 end
+    if fullText:find("amethyst") or cardName:find("amethyst") then score = score + 880 end
+    if fullText:find("diamond") or cardName:find("diamond") then score = score + 850 end
+    if fullText:find("prismatic") or fullText:find("rainbow") then score = score + 850 end
 
-    -- Tier S+: Direct Multipliers
-    if fullText:find("time sacrifice") or cardName:find("timesacrifice") then score = score + 600 end
-    if fullText:find("stack overflow") or cardName:find("stackoverflow") then score = score + 550 end
-    if fullText:find("worthy hand") or cardName:find("worthyhand") then score = score + 500 end
-    if fullText:find("midas") or cardName:find("midas") then score = score + 480 end
-    if fullText:find("moss") or cardName:find("moss") then score = score + 460 end
-    if fullText:find("golden") or cardName:find("golden") then score = score + 450 end
-    if fullText:find("heavy") or cardName:find("heavy") then score = score + 430 end
-    if fullText:find("shiny") or cardName:find("shiny") then score = score + 410 end
-    if fullText:find("singularity") or fullText:find("void") or fullText:find("quantum") then score = score + 400 end
+    -- Tier S+: Direct Value & Multiplier Boosts
+    if fullText:find("time sacrifice") or cardName:find("timesacrifice") then score = score + 650 end
+    if fullText:find("stack overflow") or cardName:find("stackoverflow") then score = score + 600 end
+    if fullText:find("worthy hand") or cardName:find("worthyhand") then score = score + 550 end
+    if fullText:find("midas") or cardName:find("midas") then score = score + 530 end
+    if fullText:find("moss") or cardName:find("moss") then score = score + 500 end
+    if fullText:find("golden") or cardName:find("golden") or fullText:find("gold") then score = score + 480 end
+    if fullText:find("heavy") or cardName:find("heavy") then score = score + 450 end
+    if fullText:find("shiny") or cardName:find("shiny") then score = score + 430 end
+    if fullText:find("singularity") or fullText:find("void") or fullText:find("quantum") then score = score + 420 end
 
-    -- Tier S: Flat Value Boosters
-    if fullText:find("hoarder") or fullText:find("22%% more qubits") then score = score + 380 end
-    if fullText:find("qubit scavenger") or fullText:find("10%% more qubits") then score = score + 350 end
-    if fullText:find("jackpot") or fullText:find("dealer") then score = score + 330 end
-    if fullText:find("mr seller") or fullText:find("magic mirror") then score = score + 320 end
-    if fullText:find("worth") or fullText:find("value") or fullText:find("onepercent") or fullText:find("1%%") then score = score + 300 end
-    if fullText:find("markup") or fullText:find("frugal fortune") then score = score + 280 end
+    -- Tier S: Multipliers parsed from string (e.g. "x3", "x2.5", "+100%")
+    local mult = fullText:match("x(%d+%.?%d*)") or fullText:match("(%d+%.?%d*)x")
+    if mult and tonumber(mult) then
+        score = score + (tonumber(mult) * 120)
+    end
+    local pct = fullText:match("%+(%d+)%%")
+    if pct and tonumber(pct) then
+        score = score + (tonumber(pct) * 2)
+    end
 
-    -- Tier A: Speed & Dropper Boosts
+    -- Tier A: Speed & Utility
     if fullText:find("overclock") or fullText:find("turbo") then score = score + 250 end
     if fullText:find("speedy") or fullText:find("conveyor") then score = score + 220 end
     if fullText:find("rush hour") or fullText:find("faster") then score = score + 200 end
@@ -1062,6 +1051,7 @@ local function autoPickBestCard()
         lastCardPick = now
         Stats.CardsVoted = Stats.CardsVoted + 1
         Stats.LastVotedCard = bestCardName
+        CardBadge.Text = "Card: " .. string.sub(bestCardName, 1, 12)
         triggerButton(bestBtn)
     end
 end
@@ -1071,7 +1061,7 @@ local lastVote = 0
 local function autoVoteDifficulty()
     if not Config.AutoVoteDifficulty then return end
     local now = tick()
-    if now - lastVote >= 1.2 then
+    if now - lastVote >= 1.0 then
         lastVote = now
         local diffRemote = getRemote("Difficulty")
         if diffRemote then
@@ -1138,35 +1128,25 @@ local function autoClaimQuests()
     end)
 end
 
--- 5. Universal Dynamic Shape Collector
+-- 5. Shape Collector Target Finder
 local function getActiveShape()
     if not Config.AutoFarm then return nil end
 
-    local folders = {
+    local shapeFolders = {
         workspace:FindFirstChild("Parts"),
         workspace:FindFirstChild("Shapesother"),
-        workspace:FindFirstChild("ChudParts")
+        workspace:FindFirstChild("ChudParts"),
+        workspace:FindFirstChild("Shapes")
     }
 
-    for _, folder in ipairs(folders) do
+    for _, folder in ipairs(shapeFolders) do
         if folder then
             for _, item in ipairs(folder:GetChildren()) do
-                if item:IsA("BasePart") then
+                if item:IsA("BasePart") and item.Transparency < 0.95 then
                     return item
                 elseif item:IsA("Model") then
                     local part = item.PrimaryPart or item:FindFirstChildWhichIsA("BasePart")
-                    if part then return part end
-                end
-            end
-        end
-    end
-
-    local map = workspace:FindFirstChild("Map")
-    if map then
-        for _, item in ipairs(map:GetChildren()) do
-            if item:IsA("BasePart") and item.Name ~= "PartSpawn" and item.Name ~= "Terrain" and item.Name ~= "SpawnLocation" then
-                if (item.Position - currentArenaAnchor).Magnitude < 120 then
-                    return item
+                    if part and part.Transparency < 0.95 then return part end
                 end
             end
         end
@@ -1175,32 +1155,27 @@ local function getActiveShape()
     return nil
 end
 
--- 6. Main Automation Loop (Dynamic Target Detection)
+-- 6. Main Automation Loop
 task.spawn(function()
     while task.wait(0.05) do
+        local newTarget = nil
+        
         if Config.AutoCollectEggs then
             local egg = getActiveEgg()
             if egg then
-                currentDestination = egg.Position + Vector3.new(0, 1, 0)
+                newTarget = egg.Position + Vector3.new(0, 1.2, 0)
                 Stats.EggsCollected = Stats.EggsCollected + 1
-            elseif Config.AutoFarm then
-                local target = getActiveShape()
-                if target then
-                    currentDestination = target.Position + Vector3.new(0, 0.5, 0)
-                else
-                    -- Safely remain at current arena anchor
-                    currentDestination = currentArenaAnchor
-                end
-            end
-        elseif Config.AutoFarm then
-            local target = getActiveShape()
-            if target then
-                currentDestination = target.Position + Vector3.new(0, 0.5, 0)
-            else
-                -- Safely remain at current arena anchor
-                currentDestination = currentArenaAnchor
             end
         end
+
+        if not newTarget and Config.AutoFarm then
+            local shape = getActiveShape()
+            if shape then
+                newTarget = shape.Position + Vector3.new(0, 0.4, 0)
+            end
+        end
+
+        activeTargetPosition = newTarget
         
         autoVoteDifficulty()
         autoPickBestCard()
@@ -1217,14 +1192,12 @@ task.spawn(function()
     end
 end)
 
--- 8. Jitter-Free Physics Lock (Heartbeat Sync)
+-- 8. Target-Only Physics Lock
 RunService.Heartbeat:Connect(function()
     if not (Config.AutoFarm or Config.AutoCollectEggs) or game.PlaceId ~= PLACE_ID then return end
 
-    if humanoidRootPart and humanoid and humanoid.Health > 0 then
-        if (humanoidRootPart.Position - currentDestination).Magnitude > 0.5 then
-            humanoidRootPart.CFrame = CFrame.new(currentDestination)
-        end
+    if activeTargetPosition and humanoidRootPart and humanoid and humanoid.Health > 0 then
+        humanoidRootPart.CFrame = CFrame.new(activeTargetPosition)
         humanoidRootPart.AssemblyLinearVelocity = Vector3.zero
         humanoidRootPart.AssemblyAngularVelocity = Vector3.zero
     end
