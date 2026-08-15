@@ -1,4 +1,4 @@
--- [[ Quantify Pro Hub - Complete Automation Suite ]] --
+-- [[ Quantify Pro Hub - Complete Automation & Live Qubit Tracker ]] --
 -- Source: https://raw.githubusercontent.com/OL3NNNNNN/quantifyyyyy/refs/heads/main/Quantify.lua
 
 local RAW_URL = "https://raw.githubusercontent.com/OL3NNNNNN/quantifyyyyy/refs/heads/main/Quantify.lua"
@@ -35,6 +35,7 @@ local TweenService = game:GetService("TweenService")
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 
+-- Safe GUI container resolution
 local function getSafeGuiParent()
     if typeof(gethui) == "function" then
         return gethui()
@@ -54,7 +55,8 @@ local DifficultyRemote = Remotes:WaitForChild("Difficulty")
 local GameEndedEvent = Remotes:WaitForChild("GameEndedEvent")
 local DailyQuestEvent = Remotes:FindFirstChild("DailyQuest")
 local CompletedQuestEvent = Remotes:FindFirstChild("CompletedQuest")
-local CodeRemote = Remotes:FindFirstChild("Code")
+local GetDataRemote = Remotes:FindFirstChild("GetData")
+local GetGameDataRemote = Remotes:FindFirstChild("GetGameData")
 
 local shapeFolders = {
     workspace:WaitForChild("Parts"),
@@ -68,7 +70,6 @@ local Config = {
     AutoVoteInsane = true,
     AutoRetry = true,
     AutoClaimQuests = true,
-    AutoCodes = true,
 }
 
 local Stats = {
@@ -88,6 +89,40 @@ player.CharacterAdded:Connect(function(newChar)
     currentDestination = spawnPos
 end)
 
+-- Live Qubit Balance Reader
+local function getLiveQubits()
+    -- 1. Check Player Attributes
+    local attr = player:GetAttribute("Qubits") or player:GetAttribute("Currency") or player:GetAttribute("Money")
+    if attr then return tostring(attr) end
+
+    -- 2. Check Leaderstats
+    local leaderstats = player:FindFirstChild("leaderstats")
+    if leaderstats then
+        local qubitObj = leaderstats:FindFirstChild("Qubits") or leaderstats:FindFirstChild("Qubit") or leaderstats:FindFirstChild("Cash")
+        if qubitObj then return tostring(qubitObj.Value) end
+    end
+
+    -- 3. Check GetData Remote
+    if GetDataRemote and GetDataRemote:IsA("RemoteFunction") then
+        local success, data = pcall(function() return GetDataRemote:InvokeServer() end)
+        if success and typeof(data) == "table" and data.Qubits then
+            return tostring(data.Qubits)
+        end
+    end
+
+    -- 4. Check UI Elements in PlayerGui
+    for _, label in ipairs(playerGui:GetDescendants()) do
+        if label:IsA("TextLabel") and label.Visible then
+            local text = label.Text
+            if text:find("Qubit") or text:match("%d+[,%d]*%s*Q") then
+                return text
+            end
+        end
+    end
+
+    return "0"
+end
+
 -- [[ MODERN GLASSMORPHIC UI ]] --
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "QuantifyHubUI"
@@ -98,7 +133,7 @@ if getgenv then getgenv().QuantifyHubUI = ScreenGui end
 
 local MainFrame = Instance.new("Frame")
 MainFrame.Name = "MainFrame"
-MainFrame.Size = UDim2.new(0, 320, 0, 345)
+MainFrame.Size = UDim2.new(0, 320, 0, 360)
 MainFrame.Position = UDim2.new(0.04, 0, 0.25, 0)
 MainFrame.BackgroundColor3 = Color3.fromRGB(15, 17, 23)
 MainFrame.BorderSizePixel = 0
@@ -157,10 +192,41 @@ ListLayout.FillDirection = Enum.FillDirection.Vertical
 ListLayout.Padding = UDim.new(0, 5)
 ListLayout.SortOrder = Enum.SortOrder.LayoutOrder
 
+-- Live Qubit Balance Display
+local QubitFrame = Instance.new("Frame", Content)
+QubitFrame.Size = UDim2.new(1, 0, 0, 34)
+QubitFrame.BackgroundColor3 = Color3.fromRGB(20, 26, 42)
+QubitFrame.BorderSizePixel = 0
+QubitFrame.LayoutOrder = 0
+Instance.new("UICorner", QubitFrame).CornerRadius = UDim.new(0, 8)
+
+local QubitStroke = Instance.new("UIStroke", QubitFrame)
+QubitStroke.Color = Color3.fromRGB(55, 85, 180)
+QubitStroke.Thickness = 1
+
+local QubitIcon = Instance.new("TextLabel", QubitFrame)
+QubitIcon.Size = UDim2.new(0, 26, 1, 0)
+QubitIcon.Position = UDim2.new(0, 8, 0, 0)
+QubitIcon.BackgroundTransparency = 1
+QubitIcon.Font = Enum.Font.GothamBold
+QubitIcon.Text = "Ⓜ"
+QubitIcon.TextColor3 = Color3.fromRGB(90, 190, 255)
+QubitIcon.TextSize = 16
+
+local QubitLabel = Instance.new("TextLabel", QubitFrame)
+QubitLabel.Size = UDim2.new(1, -40, 1, 0)
+QubitLabel.Position = UDim2.new(0, 36, 0, 0)
+QubitLabel.BackgroundTransparency = 1
+QubitLabel.Font = Enum.Font.GothamBold
+QubitLabel.Text = "Live Qubits: Syncing..."
+QubitLabel.TextColor3 = Color3.fromRGB(230, 242, 255)
+QubitLabel.TextSize = 12
+QubitLabel.TextXAlignment = Enum.TextXAlignment.Left
+
 -- Toggle Switch Component Builder
 local function createToggle(text, defaultState, callback, order)
     local row = Instance.new("Frame", Content)
-    row.Size = UDim2.new(1, 0, 0, 34)
+    row.Size = UDim2.new(1, 0, 0, 32)
     row.BackgroundColor3 = Color3.fromRGB(22, 25, 35)
     row.BorderSizePixel = 0
     row.LayoutOrder = order or 1
@@ -177,26 +243,26 @@ local function createToggle(text, defaultState, callback, order)
     label.Font = Enum.Font.GothamMedium
     label.Text = text
     label.TextColor3 = Color3.fromRGB(215, 220, 235)
-    label.TextSize = 12
+    label.TextSize = 11
     label.TextXAlignment = Enum.TextXAlignment.Left
 
     local switch = Instance.new("TextButton", row)
-    switch.Size = UDim2.new(0, 40, 0, 20)
-    switch.Position = UDim2.new(1, -48, 0.5, -10)
+    switch.Size = UDim2.new(0, 38, 0, 18)
+    switch.Position = UDim2.new(1, -46, 0.5, -9)
     switch.BackgroundColor3 = defaultState and Color3.fromRGB(90, 105, 240) or Color3.fromRGB(45, 50, 68)
     switch.Text = ""
     Instance.new("UICorner", switch).CornerRadius = UDim.new(1, 0)
 
     local knob = Instance.new("Frame", switch)
-    knob.Size = UDim2.new(0, 14, 0, 14)
-    knob.Position = defaultState and UDim2.new(1, -17, 0.5, -7) or UDim2.new(0, 3, 0.5, -7)
+    knob.Size = UDim2.new(0, 12, 0, 12)
+    knob.Position = defaultState and UDim2.new(1, -15, 0.5, -6) or UDim2.new(0, 3, 0.5, -6)
     knob.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
     Instance.new("UICorner", knob).CornerRadius = UDim.new(1, 0)
 
     local state = defaultState
     switch.MouseButton1Click:Connect(function()
         state = not state
-        local targetPos = state and UDim2.new(1, -17, 0.5, -7) or UDim2.new(0, 3, 0.5, -7)
+        local targetPos = state and UDim2.new(1, -15, 0.5, -6) or UDim2.new(0, 3, 0.5, -6)
         local targetColor = state and Color3.fromRGB(90, 105, 240) or Color3.fromRGB(45, 50, 68)
 
         TweenService:Create(knob, TweenInfo.new(0.18, Enum.EasingStyle.Quad), {Position = targetPos}):Play()
@@ -209,48 +275,47 @@ createToggle("Auto Collect Shapes", Config.AutoFarm, function(v) Config.AutoFarm
 createToggle("Auto Vote Insane", Config.AutoVoteInsane, function(v) Config.AutoVoteInsane = v end, 2)
 createToggle("Auto Retry on Loss", Config.AutoRetry, function(v) Config.AutoRetry = v end, 3)
 createToggle("Auto Claim Daily Quests", Config.AutoClaimQuests, function(v) Config.AutoClaimQuests = v end, 4)
-createToggle("Auto Redeem Active Codes", Config.AutoCodes, function(v) Config.AutoCodes = v end, 5)
 
 -- Stats / Status Footer
 local StatsRow = Instance.new("Frame", Content)
-StatsRow.Size = UDim2.new(1, 0, 0, 48)
+StatsRow.Size = UDim2.new(1, 0, 0, 42)
 StatsRow.BackgroundColor3 = Color3.fromRGB(18, 20, 28)
 StatsRow.BorderSizePixel = 0
-StatsRow.LayoutOrder = 6
+StatsRow.LayoutOrder = 5
 Instance.new("UICorner", StatsRow).CornerRadius = UDim.new(0, 8)
 
 local StatusDot = Instance.new("Frame", StatsRow)
 StatusDot.Size = UDim2.new(0, 7, 0, 7)
-StatusDot.Position = UDim2.new(0, 10, 0, 12)
+StatusDot.Position = UDim2.new(0, 10, 0, 10)
 StatusDot.BackgroundColor3 = Color3.fromRGB(70, 220, 140)
 Instance.new("UICorner", StatusDot).CornerRadius = UDim.new(1, 0)
 
 local StatusText = Instance.new("TextLabel", StatsRow)
-StatusText.Size = UDim2.new(1, -30, 0, 18)
-StatusText.Position = UDim2.new(0, 24, 0, 6)
+StatusText.Size = UDim2.new(1, -30, 0, 16)
+StatusText.Position = UDim2.new(0, 24, 0, 5)
 StatusText.BackgroundTransparency = 1
 StatusText.Font = Enum.Font.GothamMedium
-StatusText.Text = "System Active | Medium Ready"
+StatusText.Text = "System Active | Qubit Tracking ON"
 StatusText.TextColor3 = Color3.fromRGB(200, 205, 220)
-StatusText.TextSize = 11
+StatusText.TextSize = 10
 StatusText.TextXAlignment = Enum.TextXAlignment.Left
 
-local StatsText = Instance.new("TextLabel", StatsRow)
-StatsText.Size = UDim2.new(1, -20, 0, 16)
-StatsText.Position = UDim2.new(0, 10, 0, 26)
-StatsText.BackgroundTransparency = 1
-StatsText.Font = Enum.Font.Gotham
-StatsText.Text = "Retries Handled: 0 | Auto-Persist: ON"
-StatsText.TextColor3 = Color3.fromRGB(130, 138, 160)
-StatsText.TextSize = 10
-StatsText.TextXAlignment = Enum.TextXAlignment.Left
+local StatsSubText = Instance.new("TextLabel", StatsRow)
+StatsSubText.Size = UDim2.new(1, -20, 0, 14)
+StatsSubText.Position = UDim2.new(0, 10, 0, 22)
+StatsSubText.BackgroundTransparency = 1
+StatsSubText.Font = Enum.Font.Gotham
+StatsSubText.Text = "Retries Handled: 0 | Auto-Persist: ON"
+StatsSubText.TextColor3 = Color3.fromRGB(130, 138, 160)
+StatsSubText.TextSize = 9
+StatsSubText.TextXAlignment = Enum.TextXAlignment.Left
 
 -- Minimize Trigger
 local isMinimized = false
 MinBtn.MouseButton1Click:Connect(function()
     isMinimized = not isMinimized
     Content.Visible = not isMinimized
-    local newSize = isMinimized and UDim2.new(0, 320, 0, 42) or UDim2.new(0, 320, 0, 345)
+    local newSize = isMinimized and UDim2.new(0, 320, 0, 42) or UDim2.new(0, 320, 0, 360)
     TweenService:Create(MainFrame, TweenInfo.new(0.2, Enum.EasingStyle.Quad), {Size = newSize}):Play()
     MinBtn.Text = isMinimized and "+" or "-"
 end)
@@ -293,7 +358,7 @@ local function autoRetry()
     if isLossVisible then
         lastRetry = now
         Stats.RetriesHandled = Stats.RetriesHandled + 1
-        StatsText.Text = string.format("Retries Handled: %d | Auto-Persist: ON", Stats.RetriesHandled)
+        StatsSubText.Text = string.format("Retries Handled: %d | Auto-Persist: ON", Stats.RetriesHandled)
         
         task.spawn(function()
             pcall(function()
@@ -322,28 +387,7 @@ local function autoClaimQuests()
     end)
 end
 
--- 4. Auto Redeem Codes
-local codesClaimed = false
-local function autoRedeemCodes()
-    if not Config.AutoCodes or codesClaimed or not CodeRemote then return end
-    codesClaimed = true
-
-    local commonCodes = {"RELEASE", "QUANTIFY", "UPDATE", "SUMMER", "SHAPES"}
-    task.spawn(function()
-        for _, code in ipairs(commonCodes) do
-            pcall(function()
-                if CodeRemote:IsA("RemoteFunction") then
-                    CodeRemote:InvokeServer(code)
-                elseif CodeRemote:IsA("RemoteEvent") then
-                    CodeRemote:FireServer(code)
-                end
-            end)
-            task.wait(0.5)
-        end
-    end)
-end
-
--- 5. Shape Target Finder
+-- 4. Shape Target Finder
 local function getActiveShape()
     if not Config.AutoFarm then return nil end
 
@@ -372,9 +416,8 @@ local function getActiveShape()
     return nil
 end
 
--- 6. Main Automation Loop
+-- 5. Main Automation & Qubit Monitor Loop
 task.spawn(function()
-    autoRedeemCodes()
     while task.wait(0.05) do
         if Config.AutoFarm then
             local target = getActiveShape()
@@ -386,7 +429,15 @@ task.spawn(function()
     end
 end)
 
--- 7. Jitter-Free Physics Lock (Heartbeat Sync)
+-- Update Qubit Counter every 1.5s
+task.spawn(function()
+    while task.wait(1.5) do
+        local q = getLiveQubits()
+        QubitLabel.Text = string.format("Live Qubits: %s", q)
+    end
+end)
+
+-- 6. Jitter-Free Physics Lock (Heartbeat Sync)
 RunService.Heartbeat:Connect(function()
     if not Config.AutoFarm or game.PlaceId ~= PLACE_ID then return end
 
