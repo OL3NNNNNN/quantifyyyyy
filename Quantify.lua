@@ -1,4 +1,4 @@
--- [[ Quantify Pro Hub - Universal Suite with Direct Box Remotes ]] --
+-- [[ Quantify Pro Hub - Universal Suite with Box Stopping Point ]] --
 -- Source: https://raw.githubusercontent.com/OL3NNNNNN/quantifyyyyy/refs/heads/main/Quantify.lua
 
 local RAW_URL = "https://raw.githubusercontent.com/OL3NNNNNN/quantifyyyyy/refs/heads/main/Quantify.lua"
@@ -80,7 +80,7 @@ local Config = {
     AutoRetry = true,
     AutoClaimQuests = true,
     AutoOpenBoxMode = "None", -- "Classic Box", "Rare Box", "Diamond Box", or "None"
-    FastSkipBox = true
+    BoxStopThreshold = 500, -- Stop buying when Qubits reach this amount
 }
 
 local Stats = {
@@ -101,39 +101,42 @@ player.CharacterAdded:Connect(function(newChar)
     currentDestination = spawnPos
 end)
 
--- Live Qubit Balance Reader
-local function getLiveQubits()
+-- Live Qubit Balance Reader (Returns numerical amount as number)
+local function getLiveQubitNumber()
     local attr = player:GetAttribute("Qubits") or player:GetAttribute("Currency") or player:GetAttribute("Money")
-    if attr then return tostring(attr) end
+    if attr and tonumber(attr) then return tonumber(attr) end
 
     local leaderstats = player:FindFirstChild("leaderstats")
     if leaderstats then
         local qubitObj = leaderstats:FindFirstChild("Qubits") or leaderstats:FindFirstChild("Qubit") or leaderstats:FindFirstChild("Cash")
-        if qubitObj then return tostring(qubitObj.Value) end
+        if qubitObj and tonumber(qubitObj.Value) then return tonumber(qubitObj.Value) end
     end
 
     local getData = getRemote("GetData")
     if getData and getData:IsA("RemoteFunction") then
         local success, data = pcall(function() return getData:InvokeServer() end)
-        if success and typeof(data) == "table" and data.Qubits then
-            return tostring(data.Qubits)
+        if success and typeof(data) == "table" and data.Qubits and tonumber(data.Qubits) then
+            return tonumber(data.Qubits)
         end
     end
 
-    for _, label in ipairs(playerGui:GetDescendants()) do
-        if label:IsA("TextLabel") and label.Visible then
-            local text = label.Text
-            if text:find("Qubit") or text:match("%d+[,%d]*%s*Q") then
-                return text
-            end
-        end
-    end
+    return 0
+end
 
-    return "0"
+local function getLiveQubitString()
+    local num = getLiveQubitNumber()
+    return tostring(num)
 end
 
 -- [[ DIRECT BOX OPENER VIA BUILDINGBOX REMOTE ]] --
 local function buySpecificBox(boxName)
+    local currentQubits = getLiveQubitNumber()
+    if currentQubits > 0 and currentQubits <= Config.BoxStopThreshold then
+        Config.AutoOpenBoxMode = "None"
+        print(string.format("[Box Stopper] Reached reserve limit (%d Qubits). Auto-buy paused!", Config.BoxStopThreshold))
+        return false
+    end
+
     local boxRemote = getRemote("BuildingBox") or getRemote("BuildingBoxes")
     if boxRemote then
         task.spawn(function()
@@ -161,8 +164,8 @@ if getgenv then getgenv().QuantifyHubUI = ScreenGui end
 
 local MainFrame = Instance.new("Frame")
 MainFrame.Name = "MainFrame"
-MainFrame.Size = UDim2.new(0, 330, 0, 460)
-MainFrame.Position = UDim2.new(0.04, 0, 0.18, 0)
+MainFrame.Size = UDim2.new(0, 330, 0, 480)
+MainFrame.Position = UDim2.new(0.04, 0, 0.16, 0)
 MainFrame.BackgroundColor3 = Color3.fromRGB(15, 17, 23)
 MainFrame.BorderSizePixel = 0
 MainFrame.Active = true
@@ -351,6 +354,47 @@ local function createActionButton(parent, text, color, callback)
     return btn
 end
 
+-- Number Input Box Builder
+local function createInputRow(parent, labelText, defaultValue, callback)
+    local row = Instance.new("Frame", parent)
+    row.Size = UDim2.new(1, 0, 0, 34)
+    row.BackgroundColor3 = Color3.fromRGB(22, 25, 35)
+    row.BorderSizePixel = 0
+    Instance.new("UICorner", row).CornerRadius = UDim.new(0, 8)
+
+    local rowStroke = Instance.new("UIStroke", row)
+    rowStroke.Color = Color3.fromRGB(34, 38, 52)
+    rowStroke.Thickness = 1
+
+    local label = Instance.new("TextLabel", row)
+    label.Size = UDim2.new(1, -95, 1, 0)
+    label.Position = UDim2.new(0, 12, 0, 0)
+    label.BackgroundTransparency = 1
+    label.Font = Enum.Font.GothamMedium
+    label.Text = labelText
+    label.TextColor3 = Color3.fromRGB(215, 220, 235)
+    label.TextSize = 11
+    label.TextXAlignment = Enum.TextXAlignment.Left
+
+    local input = Instance.new("TextBox", row)
+    input.Size = UDim2.new(0, 75, 0, 22)
+    input.Position = UDim2.new(1, -85, 0.5, -11)
+    input.BackgroundColor3 = Color3.fromRGB(15, 17, 23)
+    input.Font = Enum.Font.GothamBold
+    input.Text = tostring(defaultValue)
+    input.TextColor3 = Color3.fromRGB(90, 190, 255)
+    input.TextSize = 11
+    Instance.new("UICorner", input).CornerRadius = UDim.new(0, 6)
+    local inputStroke = Instance.new("UIStroke", input)
+    inputStroke.Color = Color3.fromRGB(50, 60, 85)
+
+    input.FocusLost:Connect(function()
+        local num = tonumber(input.Text) or defaultValue
+        input.Text = tostring(num)
+        callback(num)
+    end)
+end
+
 -- ==========================
 -- TAB 1: LOBBY SUITE
 -- ==========================
@@ -395,6 +439,12 @@ createActionButton(LobbyPage, "👑 Buy Diamond Box (2500 Q)", Color3.fromRGB(12
 createToggle(LobbyPage, "🔄 Auto-Buy Classic Boxes", (Config.AutoOpenBoxMode == "Classic Box"), function(v) Config.AutoOpenBoxMode = v and "Classic Box" or "None" end)
 createToggle(LobbyPage, "🔄 Auto-Buy Rare Boxes", (Config.AutoOpenBoxMode == "Rare Box"), function(v) Config.AutoOpenBoxMode = v and "Rare Box" or "None" end)
 createToggle(LobbyPage, "🔄 Auto-Buy Diamond Boxes", (Config.AutoOpenBoxMode == "Diamond Box"), function(v) Config.AutoOpenBoxMode = v and "Diamond Box" or "None" end)
+
+-- Custom Stop Threshold Input
+createInputRow(LobbyPage, "🛑 Stop Buying When Qubits Reach:", Config.BoxStopThreshold, function(val)
+    Config.BoxStopThreshold = val
+    print("[Config] Auto-buy stopping threshold set to:", val)
+end)
 
 -- Lobby Teleports & Menus
 createActionButton(LobbyPage, "🚪 Teleport to Match Door", Color3.fromRGB(140, 50, 50), function()
@@ -490,7 +540,7 @@ local function createCreditCard(title, desc)
     d.TextXAlignment = Enum.TextXAlignment.Left
 end
 
-createCreditCard("Quantify Pro Hub", "Version 4.0 (Direct Remote Engine)")
+createCreditCard("Quantify Pro Hub", "Version 4.5 (Threshold Stopper Release)")
 createCreditCard("Author / Developer", "Created by OL3N for Quantify")
 createCreditCard("GitHub Repository", "raw.githubusercontent.com/OL3NNNNNN/quantifyyyyy")
 createCreditCard("Supported Environment", "Fully compatible with Medium & Standard UNC")
@@ -501,7 +551,7 @@ MinBtn.MouseButton1Click:Connect(function()
     isMinimized = not isMinimized
     ScrollContent.Visible = not isMinimized
     TabBar.Visible = not isMinimized
-    local newSize = isMinimized and UDim2.new(0, 330, 0, 42) or UDim2.new(0, 330, 0, 460)
+    local newSize = isMinimized and UDim2.new(0, 330, 0, 42) or UDim2.new(0, 330, 0, 480)
     TweenService:Create(MainFrame, TweenInfo.new(0.2, Enum.EasingStyle.Quad), {Size = newSize}):Play()
     MinBtn.Text = isMinimized and "+" or "-"
 end)
@@ -645,7 +695,7 @@ end)
 -- Live Qubit Sync Loop
 task.spawn(function()
     while task.wait(1.5) do
-        local q = getLiveQubits()
+        local q = getLiveQubitString()
         QubitLabel.Text = string.format("Live Qubits: %s", q)
     end
 end)
