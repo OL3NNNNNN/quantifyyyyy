@@ -1289,7 +1289,22 @@ end
 
 -- 5. Shape Collector Target Finder (Universal Harvester)
 local function getActiveShape()
-    if not Config.AutoFarm then return nil end
+    if not Config.AutoFarm or not humanoidRootPart then return nil end
+
+    local MAX_DISTANCE = 500
+    local closestShape = nil
+    local shortestDist = MAX_DISTANCE
+    local hrpPos = humanoidRootPart.Position
+
+    local function checkCandidate(part)
+        if part and part:IsA("BasePart") and part.Transparency < 0.95 then
+            local dist = (part.Position - hrpPos).Magnitude
+            if dist <= shortestDist then
+                shortestDist = dist
+                closestShape = part
+            end
+        end
+    end
 
     local primaryFolders = {
         workspace:FindFirstChild("Parts"),
@@ -1301,23 +1316,23 @@ local function getActiveShape()
     for _, folder in ipairs(primaryFolders) do
         if folder then
             for _, item in ipairs(folder:GetChildren()) do
-                if item:IsA("BasePart") and item.Transparency < 0.95 then
-                    return item
+                if item:IsA("BasePart") then
+                    checkCandidate(item)
                 elseif item:IsA("Model") and not item.Name:find("Nest") and not item.Name:find("Building") then
                     local part = item.PrimaryPart or item:FindFirstChildWhichIsA("BasePart")
-                    if part and part.Transparency < 0.95 then return part end
+                    checkCandidate(part)
                 end
             end
         end
     end
 
     for _, item in ipairs(workspace:GetChildren()) do
-        if item:IsA("BasePart") and item.Transparency < 0.95 and not item.Anchored and item.Name ~= "Terrain" then
-            return item
+        if item:IsA("BasePart") and not item.Anchored and item.Name ~= "Terrain" then
+            checkCandidate(item)
         end
     end
 
-    return nil
+    return closestShape
 end
 
 -- 6. Main Automation Loop
