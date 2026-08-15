@@ -1,4 +1,4 @@
--- [[ QUANTIFY PRO HUB - APEX V19.0 NON-INTRUSIVE EGG & MATCH ENGINE ]] --
+-- [[ QUANTIFY PRO HUB - APEX V20.0 TRUE TARGETED COLLECTOR ]] --
 -- Source: https://raw.githubusercontent.com/OL3NNNNNN/quantifyyyyy/refs/heads/main/Quantify.lua
 
 local RAW_URL = "https://raw.githubusercontent.com/OL3NNNNNN/quantifyyyyy/refs/heads/main/Quantify.lua"
@@ -17,7 +17,7 @@ elseif syn and typeof(syn.queue_on_teleport) == "function" then
     ]], RAW_URL))
 end
 
--- Singleton UI Manager
+-- Singleton UI Manager (Destroys older versions)
 if getgenv and getgenv().QuantifyHubLoaded then
     if getgenv().QuantifyHubUI and typeof(getgenv().QuantifyHubUI.Destroy) == "function" then
         getgenv().QuantifyHubUI:Destroy()
@@ -54,7 +54,7 @@ local CONFIG_FILE = "QuantifyProConfig.json"
 -- [[ CONFIG STATE & PERSISTENCE ]] --
 local Config = {
     AutoFarm = true,
-    AutoCollectEggs = true,
+    AutoCollectEggs = false, -- Default false so it never interferes
     AutoVoteDifficulty = true,
     SelectedDifficulty = "Insane",
     AutoPickBestCard = true,
@@ -263,7 +263,7 @@ Title.Size = UDim2.new(1, -120, 1, 0)
 Title.Position = UDim2.new(0, 50, 0, 0)
 Title.BackgroundTransparency = 1
 Title.Font = Enum.Font.GothamBold
-Title.Text = "QUANTIFY <font color='#6366F1'>PRO</font> <font color='#38BDF8'>V19</font>"
+Title.Text = "QUANTIFY <font color='#6366F1'>PRO</font> <font color='#38BDF8'>V20</font>"
 Title.RichText = true
 Title.TextColor3 = Colors.TextPrimary
 Title.TextSize = 14
@@ -817,7 +817,7 @@ createActionButton(CreditsPage, "🔄 Reload Configuration", "Reloads saved conf
 end)
 
 createSectionHeader(CreditsPage, "⭐ Release & Repository Info")
-createCreditCard("Quantify Pro Hub (Apex V19.0)", "Complete Non-Intrusive Match Engine", Colors.Accent)
+createCreditCard("Quantify Pro Hub (Apex V20.0)", "Complete Target-Locked Match Engine", Colors.Accent)
 createCreditCard("Developer", "Created by OL3N for Quantify", Colors.AccentGold)
 createCreditCard("GitHub Script URL", "raw.githubusercontent.com/OL3NNNNNN/quantifyyyyy", Colors.AccentCyan)
 createCreditCard("Universal Compatibility", "Works on Medium, Macsploit & UNC Executors", Colors.AccentGreen)
@@ -928,10 +928,9 @@ local function autoBuildUniqueStack()
     end
 end
 
--- [[ NON-INTRUSIVE EGG TOUCH & PROXIMITY GRABBER ]] --
--- Fires touch/proximity in the background without locking character coordinates
+-- [[ BACKGROUND PROXIMITY EGG GRABBER ]] --
 task.spawn(function()
-    while task.wait(0.5) do
+    while task.wait(0.8) do
         if Config.AutoCollectEggs and humanoidRootPart then
             local map = workspace:FindFirstChild("Map")
             if map then
@@ -1162,25 +1161,29 @@ local function autoClaimQuests()
     end)
 end
 
--- 5. Shape Collector Target Finder (Conveyor Droppers ONLY)
+-- 5. Shape Collector Target Finder (Strict Non-Map Dropped Shapes ONLY)
 local function getActiveShape()
     if not Config.AutoFarm then return nil end
 
-    local shapeFolders = {
+    -- Only check dedicated shape drop containers
+    local foldersToCheck = {
         workspace:FindFirstChild("Parts"),
         workspace:FindFirstChild("Shapesother"),
         workspace:FindFirstChild("ChudParts"),
         workspace:FindFirstChild("Shapes")
     }
 
-    for _, folder in ipairs(shapeFolders) do
-        if folder then
+    for _, folder in ipairs(foldersToCheck) do
+        if folder and folder ~= workspace:FindFirstChild("Map") then
             for _, item in ipairs(folder:GetChildren()) do
-                if item:IsA("BasePart") and item.Transparency < 0.95 then
-                    return item
-                elseif item:IsA("Model") then
-                    local part = item.PrimaryPart or item:FindFirstChildWhichIsA("BasePart")
-                    if part and part.Transparency < 0.95 then return part end
+                -- Exclude static map architecture or nest models
+                if not item:IsDescendantOf(workspace:FindFirstChild("Map") or folder) or folder.Name ~= "Map" then
+                    if item:IsA("BasePart") and item.Transparency < 0.95 then
+                        return item
+                    elseif item:IsA("Model") and not item.Name:find("Nest") and not item.Name:find("Building") then
+                        local part = item.PrimaryPart or item:FindFirstChildWhichIsA("BasePart")
+                        if part and part.Transparency < 0.95 then return part end
+                    end
                 end
             end
         end
@@ -1194,7 +1197,6 @@ task.spawn(function()
     while task.wait(0.05) do
         local newTarget = nil
         
-        -- Strictly target active conveyor shapes
         if Config.AutoFarm then
             local shape = getActiveShape()
             if shape then
