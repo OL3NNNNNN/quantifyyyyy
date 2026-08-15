@@ -1,4 +1,4 @@
--- [[ QUANTIFY PRO HUB - APEX V18.0 SPAWN-AWARE EGG HUNTER ]] --
+-- [[ QUANTIFY PRO HUB - APEX V19.0 NON-INTRUSIVE EGG & MATCH ENGINE ]] --
 -- Source: https://raw.githubusercontent.com/OL3NNNNNN/quantifyyyyy/refs/heads/main/Quantify.lua
 
 local RAW_URL = "https://raw.githubusercontent.com/OL3NNNNNN/quantifyyyyy/refs/heads/main/Quantify.lua"
@@ -263,7 +263,7 @@ Title.Size = UDim2.new(1, -120, 1, 0)
 Title.Position = UDim2.new(0, 50, 0, 0)
 Title.BackgroundTransparency = 1
 Title.Font = Enum.Font.GothamBold
-Title.Text = "QUANTIFY <font color='#6366F1'>PRO</font> <font color='#38BDF8'>V18</font>"
+Title.Text = "QUANTIFY <font color='#6366F1'>PRO</font> <font color='#38BDF8'>V19</font>"
 Title.RichText = true
 Title.TextColor3 = Colors.TextPrimary
 Title.TextSize = 14
@@ -325,7 +325,7 @@ CardBadge.Size = UDim2.new(0.42, 0, 1, 0)
 CardBadge.Position = UDim2.new(0.58, 0, 0, 0)
 CardBadge.BackgroundTransparency = 1
 CardBadge.Font = Enum.Font.GothamMedium
-CardBadge.Text = "Status: Ready"
+CardBadge.Text = "Status: Active"
 CardBadge.TextColor3 = Colors.AccentGold
 CardBadge.TextSize = 10
 CardBadge.TextXAlignment = Enum.TextXAlignment.Right
@@ -688,7 +688,7 @@ end)
 createSectionHeader(MainPage, "⚡ Match Automation Core")
 createToggle(MainPage, "Auto Collect Shapes", "Only touches active shapes on conveyors", Config.AutoFarm, function(v) Config.AutoFarm = v end)
 createToggle(MainPage, "🏗️ Auto-Build Unique Vertical Stack", "Buys each unique upgrader once & stacks above you", Config.AutoBuildStack, function(v) Config.AutoBuildStack = v end)
-createToggle(MainPage, "🥚 Auto Collect Event Eggs", "Only grabs egg after Round 9 when hatched", Config.AutoCollectEggs, function(v) Config.AutoCollectEggs = v end)
+createToggle(MainPage, "🥚 Auto Collect Event Eggs", "Background remote claim & proximity collection", Config.AutoCollectEggs, function(v) Config.AutoCollectEggs = v end)
 createToggle(MainPage, "Auto Select Best Card", "Ranks Red, Gold, Emerald & Multiplier Cards", Config.AutoPickBestCard, function(v) Config.AutoPickBestCard = v end)
 createToggle(MainPage, "Auto Retry On Loss", "Restarts match immediately on defeat", Config.AutoRetry, function(v) Config.AutoRetry = v end)
 createToggle(MainPage, "Auto Claim Daily Quests", "Claims quest rewards in background", Config.AutoClaimQuests, function(v) Config.AutoClaimQuests = v end)
@@ -817,7 +817,7 @@ createActionButton(CreditsPage, "🔄 Reload Configuration", "Reloads saved conf
 end)
 
 createSectionHeader(CreditsPage, "⭐ Release & Repository Info")
-createCreditCard("Quantify Pro Hub (Apex V18.0)", "Complete Spawn-Aware Egg & Match Engine", Colors.Accent)
+createCreditCard("Quantify Pro Hub (Apex V19.0)", "Complete Non-Intrusive Match Engine", Colors.Accent)
 createCreditCard("Developer", "Created by OL3N for Quantify", Colors.AccentGold)
 createCreditCard("GitHub Script URL", "raw.githubusercontent.com/OL3NNNNNN/quantifyyyyy", Colors.AccentCyan)
 createCreditCard("Universal Compatibility", "Works on Medium, Macsploit & UNC Executors", Colors.AccentGreen)
@@ -928,41 +928,24 @@ local function autoBuildUniqueStack()
     end
 end
 
--- [[ SPAWN-AWARE EGG HUNTER ]] --
-local function getActiveEgg()
-    if not Config.AutoCollectEggs then return nil end
-
-    local map = workspace:FindFirstChild("Map")
-    if not map then return nil end
-
-    for _, item in ipairs(map:GetChildren()) do
-        if item.Name == "Nest" and item:IsA("Model") then
-            -- Verify if the egg is actually ready or still waiting
-            local isWaiting = false
-            for _, descendant in ipairs(item:GetDescendants()) do
-                if descendant:IsA("TextLabel") and descendant.Visible then
-                    local text = string.lower(descendant.Text)
-                    if text:find("spawns after") or text:find("after round") then
-                        isWaiting = true
-                        break
-                    end
-                end
-            end
-
-            -- If the egg has not spawned yet, DO NOT teleport into the nest!
-            if not isWaiting then
-                local nestModel = item:FindFirstChild("NestModel")
-                if nestModel then
-                    for _, folder in ipairs(nestModel:GetChildren()) do
-                        if folder:IsA("Folder") and folder.Name:find("ExampleCF") then
-                            for _, eggNum in ipairs(folder:GetChildren()) do
-                                local eggPart = eggNum:FindFirstChild("EggShadow") or eggNum:FindFirstChildWhichIsA("BasePart")
-                                if eggPart and eggPart:IsA("BasePart") then
-                                    if humanoidRootPart and typeof(firetouchinterest) == "function" then
-                                        firetouchinterest(humanoidRootPart, eggPart, 0)
-                                        firetouchinterest(humanoidRootPart, eggPart, 1)
-                                    end
-                                    return eggPart
+-- [[ NON-INTRUSIVE EGG TOUCH & PROXIMITY GRABBER ]] --
+-- Fires touch/proximity in the background without locking character coordinates
+task.spawn(function()
+    while task.wait(0.5) do
+        if Config.AutoCollectEggs and humanoidRootPart then
+            local map = workspace:FindFirstChild("Map")
+            if map then
+                for _, item in ipairs(map:GetChildren()) do
+                    if item.Name == "Nest" and item:IsA("Model") then
+                        for _, desc in ipairs(item:GetDescendants()) do
+                            if desc:IsA("BasePart") and desc.Transparency < 0.95 then
+                                if typeof(firetouchinterest) == "function" then
+                                    firetouchinterest(humanoidRootPart, desc, 0)
+                                    firetouchinterest(humanoidRootPart, desc, 1)
+                                end
+                            elseif desc:IsA("ProximityPrompt") and desc.Enabled then
+                                if typeof(fireproximityprompt) == "function" then
+                                    fireproximityprompt(desc)
                                 end
                             end
                         end
@@ -971,9 +954,7 @@ local function getActiveEgg()
             end
         end
     end
-
-    return nil
-end
+end)
 
 -- Auto Claim Hatching Slots
 task.spawn(function()
@@ -1181,7 +1162,7 @@ local function autoClaimQuests()
     end)
 end
 
--- 5. Shape Collector Target Finder
+-- 5. Shape Collector Target Finder (Conveyor Droppers ONLY)
 local function getActiveShape()
     if not Config.AutoFarm then return nil end
 
@@ -1213,15 +1194,8 @@ task.spawn(function()
     while task.wait(0.05) do
         local newTarget = nil
         
-        if Config.AutoCollectEggs then
-            local egg = getActiveEgg()
-            if egg then
-                newTarget = egg.Position + Vector3.new(0, 1.2, 0)
-                Stats.EggsCollected = Stats.EggsCollected + 1
-            end
-        end
-
-        if not newTarget and Config.AutoFarm then
+        -- Strictly target active conveyor shapes
+        if Config.AutoFarm then
             local shape = getActiveShape()
             if shape then
                 newTarget = shape.Position + Vector3.new(0, 0.4, 0)
@@ -1248,7 +1222,7 @@ end)
 
 -- 8. Target-Only Physics Lock
 RunService.Heartbeat:Connect(function()
-    if not (Config.AutoFarm or Config.AutoCollectEggs) or game.PlaceId ~= PLACE_ID then return end
+    if not Config.AutoFarm or game.PlaceId ~= PLACE_ID then return end
 
     if activeTargetPosition and humanoidRootPart and humanoid and humanoid.Health > 0 then
         humanoidRootPart.CFrame = CFrame.new(activeTargetPosition)
