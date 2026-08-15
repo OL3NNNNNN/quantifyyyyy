@@ -1,4 +1,4 @@
--- [[ QUANTIFY PRO HUB - APEX V26.0 DIRECT PURCHASE & AUTO-PLACE ENGINE ]] --
+-- [[ QUANTIFY PRO HUB - APEX V28.0 AUTO-INVENTORY POPPER & CHUTE BUILDER ]] --
 -- Source: https://raw.githubusercontent.com/OL3NNNNNN/quantifyyyyy/refs/heads/main/Quantify.lua
 
 local RAW_URL = "https://raw.githubusercontent.com/OL3NNNNNN/quantifyyyyy/refs/heads/main/Quantify.lua"
@@ -34,6 +34,8 @@ local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 local Lighting = game:GetService("Lighting")
 local HttpService = game:GetService("HttpService")
+local VirtualInputManager = nil
+pcall(function() VirtualInputManager = game:GetService("VirtualInputManager") end)
 
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
@@ -60,7 +62,7 @@ local Config = {
     AutoRetry = true,
     AutoClaimQuests = true,
     
-    -- Auto-Builder Feature
+    -- Auto-Builder Feature (Chute Stacking Mode)
     AutoBuildStack = true,
     
     -- Movement & Utilities
@@ -117,8 +119,8 @@ local humanoidRootPart = character:WaitForChild("HumanoidRootPart")
 local humanoid = character:WaitForChild("Humanoid")
 local activeTargetPosition = nil
 local placedUpgradersRegistry = {}
-local fixedBuildOrigin = nil
-local buildItemCount = 0
+local fixedStackBasePosition = nil
+local currentStackHeight = 3.5
 
 player.CharacterAdded:Connect(function(newChar)
     character = newChar
@@ -126,8 +128,8 @@ player.CharacterAdded:Connect(function(newChar)
     humanoid = newChar:WaitForChild("Humanoid")
     activeTargetPosition = nil
     placedUpgradersRegistry = {}
-    fixedBuildOrigin = nil
-    buildItemCount = 0
+    fixedStackBasePosition = nil
+    currentStackHeight = 3.5
     
     if Config.SpeedBoost and humanoid then
         humanoid.WalkSpeed = Config.SpeedValue
@@ -266,7 +268,7 @@ Title.Size = UDim2.new(1, -120, 1, 0)
 Title.Position = UDim2.new(0, 50, 0, 0)
 Title.BackgroundTransparency = 1
 Title.Font = Enum.Font.GothamBold
-Title.Text = "QUANTIFY <font color='#6366F1'>PRO</font> <font color='#38BDF8'>V26</font>"
+Title.Text = "QUANTIFY <font color='#6366F1'>PRO</font> <font color='#38BDF8'>V28</font>"
 Title.RichText = true
 Title.TextColor3 = Colors.TextPrimary
 Title.TextSize = 14
@@ -328,7 +330,7 @@ CardBadge.Size = UDim2.new(0.42, 0, 1, 0)
 CardBadge.Position = UDim2.new(0.58, 0, 0, 0)
 CardBadge.BackgroundTransparency = 1
 CardBadge.Font = Enum.Font.GothamMedium
-CardBadge.Text = "Status: Active"
+CardBadge.Text = "Inventory Pop: ON"
 CardBadge.TextColor3 = Colors.AccentGold
 CardBadge.TextSize = 10
 CardBadge.TextXAlignment = Enum.TextXAlignment.Right
@@ -690,7 +692,7 @@ end)
 -- ===================================
 createSectionHeader(MainPage, "⚡ Match Automation Core")
 createToggle(MainPage, "Auto Collect Shapes", "Instantly touches and collects active shapes", Config.AutoFarm, function(v) Config.AutoFarm = v end)
-createToggle(MainPage, "🏗️ Auto-Buy & Place Droppers/Upgraders", "Buys droppers & upgraders and places them safely in row", Config.AutoBuildStack, function(v) Config.AutoBuildStack = v end)
+createToggle(MainPage, "🏗️ Auto-Open Inventory & Vertical Stack", "Opens inventory automatically & stacks droppers above upgraders", Config.AutoBuildStack, function(v) Config.AutoBuildStack = v end)
 createToggle(MainPage, "🥚 Auto Collect Event Eggs", "Background remote claim & proximity collection", Config.AutoCollectEggs, function(v) Config.AutoCollectEggs = v end)
 createToggle(MainPage, "Auto Select Best Card", "Ranks Red, Gold, Emerald & Multiplier Cards", Config.AutoPickBestCard, function(v) Config.AutoPickBestCard = v end)
 createToggle(MainPage, "Auto Retry On Loss", "Restarts match immediately on defeat", Config.AutoRetry, function(v) Config.AutoRetry = v end)
@@ -820,7 +822,7 @@ createActionButton(CreditsPage, "🔄 Reload Configuration", "Reloads saved conf
 end)
 
 createSectionHeader(CreditsPage, "⭐ Release & Repository Info")
-createCreditCard("Quantify Pro Hub (Apex V26.0)", "Direct Buy & Row Placement Engine", Colors.Accent)
+createCreditCard("Quantify Pro Hub (Apex V28.0)", "Complete Auto-Inventory & Vertical Chute Suite", Colors.Accent)
 createCreditCard("Developer", "Created by OL3N for Quantify", Colors.AccentGold)
 createCreditCard("GitHub Script URL", "raw.githubusercontent.com/OL3NNNNNN/quantifyyyyy", Colors.AccentCyan)
 createCreditCard("Universal Compatibility", "Works on Medium, Macsploit & UNC Executors", Colors.AccentGreen)
@@ -883,24 +885,80 @@ task.spawn(function()
     end
 end)
 
--- [[ DIRECT AUTO-BUY & FIXED ROW BUILDER ]] --
+-- Helper: Locate Main Conveyor Base Position
+local function findConveyorBasePosition()
+    if fixedStackBasePosition then return fixedStackBasePosition end
+
+    local map = workspace:FindFirstChild("Map")
+    if map then
+        for _, item in ipairs(map:GetDescendants()) do
+            if item:IsA("BasePart") and (item.Name:lower():find("conveyor") or item.Name:lower():find("belt") or item.Name:lower():find("drop")) then
+                fixedStackBasePosition = item.Position
+                return fixedStackBasePosition
+            end
+        end
+    end
+
+    if humanoidRootPart then
+        fixedStackBasePosition = humanoidRootPart.Position + Vector3.new(3, 0, 0)
+        return fixedStackBasePosition
+    end
+
+    return Vector3.new(0, 5, 0)
+end
+
+-- Helper: Ensure Inventory UI Is Open
+local function ensureInventoryIsOpen()
+    -- Check if Inventory / Shop Frame is already open
+    local invOpen = false
+    for _, gui in ipairs(playerGui:GetDescendants()) do
+        if (gui:IsA("Frame") or gui:IsA("ScrollingFrame")) and gui.Visible then
+            local n = gui.Name:lower()
+            if n:find("inventory") or n:find("buildingshop") or n:find("shop") or n:find("dropper") then
+                invOpen = true
+                break
+            end
+        end
+    end
+
+    if not invOpen then
+        -- Method 1: Press 'C' keybind via VirtualInputManager
+        if VirtualInputManager then
+            VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.C, false, game)
+            task.wait(0.05)
+            VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.C, false, game)
+        end
+
+        -- Method 2: Click [C] Inventory button on HUD
+        for _, btn in ipairs(playerGui:GetDescendants()) do
+            if (btn:IsA("TextButton") or btn:IsA("ImageButton")) and btn.Visible then
+                local t = btn:IsA("TextButton") and btn.Text:lower() or ""
+                local n = btn.Name:lower()
+                if t:find("inventory") or n:find("inventory") or t:find("[c]") then
+                    triggerButton(btn)
+                end
+            end
+        end
+    end
+end
+
+-- [[ PERFECT VERTICAL CONVEYOR STACK BUILDER ]] --
 local lastBuildAttempt = 0
 
-local function autoBuyAndPlaceMachines()
+local function autoBuildVerticalStack()
     if not Config.AutoBuildStack or not humanoidRootPart then return end
     local now = tick()
     if now - lastBuildAttempt < 1.2 then return end
     lastBuildAttempt = now
 
-    if not fixedBuildOrigin then
-        fixedBuildOrigin = humanoidRootPart.Position + Vector3.new(4, 0, 0)
-    end
+    -- Auto-open inventory pop-up
+    ensureInventoryIsOpen()
 
+    local basePos = findConveyorBasePosition()
     local placeRemote = getRemote("PlaceBuilding") or getRemote("Place") or getRemote("Build") or getRemote("PlaceItem")
     local buyRemote = getRemote("BuyBuilding") or getRemote("BuyItem") or getRemote("Buy")
     local candidates = {}
 
-    -- Scan for shop buttons with prices
     for _, gui in ipairs(playerGui:GetDescendants()) do
         if (gui:IsA("TextButton") or gui:IsA("ImageButton")) and gui.Visible then
             local itemName = gui.Name
@@ -941,10 +999,8 @@ local function autoBuyAndPlaceMachines()
         local chosen = candidates[1]
         placedUpgradersRegistry[chosen.Name] = true
         
-        -- Direct button trigger
         triggerButton(chosen.Button)
 
-        -- Direct Remote Purchase Attempt
         if buyRemote then
             task.spawn(function()
                 pcall(function()
@@ -957,17 +1013,16 @@ local function autoBuyAndPlaceMachines()
             end)
         end
 
-        local spotCFrame = CFrame.new(fixedBuildOrigin + Vector3.new(buildItemCount * 3.5, 0, 0))
-        buildItemCount = buildItemCount + 1
+        local stackCFrame = CFrame.new(basePos + Vector3.new(0, currentStackHeight, 0))
+        currentStackHeight = currentStackHeight + 2.5
 
-        -- Direct Remote Placement Attempt
         if placeRemote then
             task.spawn(function()
                 pcall(function()
                     if placeRemote:IsA("RemoteFunction") then
-                        placeRemote:InvokeServer(chosen.Name, spotCFrame)
+                        placeRemote:InvokeServer(chosen.Name, stackCFrame)
                     else
-                        placeRemote:FireServer(chosen.Name, spotCFrame)
+                        placeRemote:FireServer(chosen.Name, stackCFrame)
                     end
                 end)
             end)
@@ -1187,8 +1242,8 @@ local function autoRetry()
         lastRetry = now
         Stats.RetriesHandled = Stats.RetriesHandled + 1
         placedUpgradersRegistry = {}
-        fixedBuildOrigin = nil
-        buildItemCount = 0
+        fixedStackBasePosition = nil
+        currentStackHeight = 3.5
         local endedEvent = getRemote("GameEndedEvent")
         if endedEvent then
             task.spawn(function()
@@ -1278,7 +1333,7 @@ task.spawn(function()
         autoPickBestCard()
         autoRetry()
         autoClaimQuests()
-        autoBuyAndPlaceMachines()
+        autoBuildVerticalStack()
     end
 end)
 
