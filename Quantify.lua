@@ -1,4 +1,4 @@
--- [[ QUANTIFY PRO HUB - APEX V28.0 AUTO-INVENTORY POPPER & CHUTE BUILDER ]] --
+-- [[ QUANTIFY PRO HUB - APEX V29.0 ACTIVE INVENTORY UNLOCKER & AUTO-BUILDER ]] --
 -- Source: https://raw.githubusercontent.com/OL3NNNNNN/quantifyyyyy/refs/heads/main/Quantify.lua
 
 local RAW_URL = "https://raw.githubusercontent.com/OL3NNNNNN/quantifyyyyy/refs/heads/main/Quantify.lua"
@@ -62,7 +62,7 @@ local Config = {
     AutoRetry = true,
     AutoClaimQuests = true,
     
-    -- Auto-Builder Feature (Chute Stacking Mode)
+    -- Auto-Builder Feature (Active Stacking Mode)
     AutoBuildStack = true,
     
     -- Movement & Utilities
@@ -268,7 +268,7 @@ Title.Size = UDim2.new(1, -120, 1, 0)
 Title.Position = UDim2.new(0, 50, 0, 0)
 Title.BackgroundTransparency = 1
 Title.Font = Enum.Font.GothamBold
-Title.Text = "QUANTIFY <font color='#6366F1'>PRO</font> <font color='#38BDF8'>V28</font>"
+Title.Text = "QUANTIFY <font color='#6366F1'>PRO</font> <font color='#38BDF8'>V29</font>"
 Title.RichText = true
 Title.TextColor3 = Colors.TextPrimary
 Title.TextSize = 14
@@ -330,7 +330,7 @@ CardBadge.Size = UDim2.new(0.42, 0, 1, 0)
 CardBadge.Position = UDim2.new(0.58, 0, 0, 0)
 CardBadge.BackgroundTransparency = 1
 CardBadge.Font = Enum.Font.GothamMedium
-CardBadge.Text = "Inventory Pop: ON"
+CardBadge.Text = "Auto-Build: Ready"
 CardBadge.TextColor3 = Colors.AccentGold
 CardBadge.TextSize = 10
 CardBadge.TextXAlignment = Enum.TextXAlignment.Right
@@ -822,7 +822,7 @@ createActionButton(CreditsPage, "🔄 Reload Configuration", "Reloads saved conf
 end)
 
 createSectionHeader(CreditsPage, "⭐ Release & Repository Info")
-createCreditCard("Quantify Pro Hub (Apex V28.0)", "Complete Auto-Inventory & Vertical Chute Suite", Colors.Accent)
+createCreditCard("Quantify Pro Hub (Apex V29.0)", "Complete Auto-Inventory & Vertical Chute Suite", Colors.Accent)
 createCreditCard("Developer", "Created by OL3N for Quantify", Colors.AccentGold)
 createCreditCard("GitHub Script URL", "raw.githubusercontent.com/OL3NNNNNN/quantifyyyyy", Colors.AccentCyan)
 createCreditCard("Universal Compatibility", "Works on Medium, Macsploit & UNC Executors", Colors.AccentGreen)
@@ -907,38 +907,41 @@ local function findConveyorBasePosition()
     return Vector3.new(0, 5, 0)
 end
 
--- Helper: Ensure Inventory UI Is Open
+-- Helper: Ensure Inventory UI Is Open (Deep Scanning & Force-Visibility)
 local function ensureInventoryIsOpen()
-    -- Check if Inventory / Shop Frame is already open
-    local invOpen = false
-    for _, gui in ipairs(playerGui:GetDescendants()) do
-        if (gui:IsA("Frame") or gui:IsA("ScrollingFrame")) and gui.Visible then
-            local n = gui.Name:lower()
-            if n:find("inventory") or n:find("buildingshop") or n:find("shop") or n:find("dropper") then
-                invOpen = true
-                break
+    -- 1. Direct Side/HUD Frame Unhide
+    local inventoryFrames = {
+        playerGui:FindFirstChild("HUD") and playerGui.HUD:FindFirstChild("Inventory"),
+        playerGui:FindFirstChild("GameHUD") and playerGui.GameHUD:FindFirstChild("Inventory"),
+        playerGui:FindFirstChild("Inventory"),
+        playerGui:FindFirstChild("Side") and playerGui.Side:FindFirstChild("Inventory"),
+        playerGui:FindFirstChild("BuildingShop"),
+    }
+
+    for _, frame in ipairs(inventoryFrames) do
+        if frame and frame:IsA("GuiObject") then
+            frame.Visible = true
+        end
+    end
+
+    -- 2. Click sidebar and screen [C] buttons
+    for _, btn in ipairs(playerGui:GetDescendants()) do
+        if (btn:IsA("TextButton") or btn:IsA("ImageButton")) and btn.Visible then
+            local t = btn:IsA("TextButton") and btn.Text:lower() or ""
+            local n = btn.Name:lower()
+            if (t:find("inventory") or n:find("inventory") or t:find("[c]")) and not n:find("close") then
+                triggerButton(btn)
             end
         end
     end
 
-    if not invOpen then
-        -- Method 1: Press 'C' keybind via VirtualInputManager
-        if VirtualInputManager then
+    -- 3. Virtual Input Keycode C
+    if VirtualInputManager then
+        pcall(function()
             VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.C, false, game)
-            task.wait(0.05)
+            task.wait(0.04)
             VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.C, false, game)
-        end
-
-        -- Method 2: Click [C] Inventory button on HUD
-        for _, btn in ipairs(playerGui:GetDescendants()) do
-            if (btn:IsA("TextButton") or btn:IsA("ImageButton")) and btn.Visible then
-                local t = btn:IsA("TextButton") and btn.Text:lower() or ""
-                local n = btn.Name:lower()
-                if t:find("inventory") or n:find("inventory") or t:find("[c]") then
-                    triggerButton(btn)
-                end
-            end
-        end
+        end)
     end
 end
 
@@ -948,10 +951,9 @@ local lastBuildAttempt = 0
 local function autoBuildVerticalStack()
     if not Config.AutoBuildStack or not humanoidRootPart then return end
     local now = tick()
-    if now - lastBuildAttempt < 1.2 then return end
+    if now - lastBuildAttempt < 1.0 then return end
     lastBuildAttempt = now
 
-    -- Auto-open inventory pop-up
     ensureInventoryIsOpen()
 
     local basePos = findConveyorBasePosition()
@@ -959,14 +961,15 @@ local function autoBuildVerticalStack()
     local buyRemote = getRemote("BuyBuilding") or getRemote("BuyItem") or getRemote("Buy")
     local candidates = {}
 
+    -- Scan for machine purchase buttons even if hidden in subfolders
     for _, gui in ipairs(playerGui:GetDescendants()) do
-        if (gui:IsA("TextButton") or gui:IsA("ImageButton")) and gui.Visible then
+        if (gui:IsA("TextButton") or gui:IsA("ImageButton")) then
             local itemName = gui.Name
             local pName = gui.Parent and gui.Parent.Name or ""
             local fullText = ""
             
             for _, lbl in ipairs(gui:GetDescendants()) do
-                if lbl:IsA("TextLabel") and lbl.Visible then
+                if lbl:IsA("TextLabel") then
                     fullText = fullText .. " " .. lbl.Text
                 end
             end
@@ -1013,8 +1016,8 @@ local function autoBuildVerticalStack()
             end)
         end
 
-        local stackCFrame = CFrame.new(basePos + Vector3.new(0, currentStackHeight, 0))
-        currentStackHeight = currentStackHeight + 2.5
+        -- Place 1 stud directly above the player's character
+        local stackCFrame = CFrame.new(humanoidRootPart.Position + Vector3.new(0, 1.0, 0))
 
         if placeRemote then
             task.spawn(function()
