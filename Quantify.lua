@@ -1,4 +1,4 @@
--- [[ QUANTIFY PRO HUB - APEX V21.0 DUAL-LAYER DIFFICULTY VOTER ]] --
+-- [[ QUANTIFY PRO HUB - APEX V22.0 CHEAPEST-FIRST AUTO BUILDER ]] --
 -- Source: https://raw.githubusercontent.com/OL3NNNNNN/quantifyyyyy/refs/heads/main/Quantify.lua
 
 local RAW_URL = "https://raw.githubusercontent.com/OL3NNNNNN/quantifyyyyy/refs/heads/main/Quantify.lua"
@@ -17,7 +17,7 @@ elseif syn and typeof(syn.queue_on_teleport) == "function" then
     ]], RAW_URL))
 end
 
--- Singleton UI Manager (Destroys older versions)
+-- Singleton UI Manager
 if getgenv and getgenv().QuantifyHubLoaded then
     if getgenv().QuantifyHubUI and typeof(getgenv().QuantifyHubUI.Destroy) == "function" then
         getgenv().QuantifyHubUI:Destroy()
@@ -61,8 +61,8 @@ local Config = {
     AutoRetry = true,
     AutoClaimQuests = true,
     
-    -- Auto-Builder Feature
-    AutoBuildStack = false,
+    -- Auto-Builder Feature (Droppers + Upgraders)
+    AutoBuildStack = true,
     
     -- Movement & Utilities
     SpeedBoost = false,
@@ -263,7 +263,7 @@ Title.Size = UDim2.new(1, -120, 1, 0)
 Title.Position = UDim2.new(0, 50, 0, 0)
 Title.BackgroundTransparency = 1
 Title.Font = Enum.Font.GothamBold
-Title.Text = "QUANTIFY <font color='#6366F1'>PRO</font> <font color='#38BDF8'>V21</font>"
+Title.Text = "QUANTIFY <font color='#6366F1'>PRO</font> <font color='#38BDF8'>V22</font>"
 Title.RichText = true
 Title.TextColor3 = Colors.TextPrimary
 Title.TextSize = 14
@@ -325,7 +325,7 @@ CardBadge.Size = UDim2.new(0.42, 0, 1, 0)
 CardBadge.Position = UDim2.new(0.58, 0, 0, 0)
 CardBadge.BackgroundTransparency = 1
 CardBadge.Font = Enum.Font.GothamMedium
-CardBadge.Text = "Status: Active"
+CardBadge.Text = "Build: Active"
 CardBadge.TextColor3 = Colors.AccentGold
 CardBadge.TextSize = 10
 CardBadge.TextXAlignment = Enum.TextXAlignment.Right
@@ -683,11 +683,11 @@ createActionButton(LobbyPage, "📜 Open Quests Menu", "Toggle Daily & Completed
 end)
 
 -- ===================================
--- TAB 2: MATCH AI, DIFFICULTY & UNIQUE AUTO-BUILDER
+-- TAB 2: MATCH AI, DIFFICULTY & AUTO-BUILDER
 -- ===================================
 createSectionHeader(MainPage, "⚡ Match Automation Core")
 createToggle(MainPage, "Auto Collect Shapes", "Only touches active shapes on conveyors", Config.AutoFarm, function(v) Config.AutoFarm = v end)
-createToggle(MainPage, "🏗️ Auto-Build Unique Vertical Stack", "Buys each unique upgrader once & stacks above you", Config.AutoBuildStack, function(v) Config.AutoBuildStack = v end)
+createToggle(MainPage, "🏗️ Auto-Build Machines (Cheapest First)", "Buys cheapest droppers & upgraders and stacks vertically", Config.AutoBuildStack, function(v) Config.AutoBuildStack = v end)
 createToggle(MainPage, "🥚 Auto Collect Event Eggs", "Background remote claim & proximity collection", Config.AutoCollectEggs, function(v) Config.AutoCollectEggs = v end)
 createToggle(MainPage, "Auto Select Best Card", "Ranks Red, Gold, Emerald & Multiplier Cards", Config.AutoPickBestCard, function(v) Config.AutoPickBestCard = v end)
 createToggle(MainPage, "Auto Retry On Loss", "Restarts match immediately on defeat", Config.AutoRetry, function(v) Config.AutoRetry = v end)
@@ -817,7 +817,7 @@ createActionButton(CreditsPage, "🔄 Reload Configuration", "Reloads saved conf
 end)
 
 createSectionHeader(CreditsPage, "⭐ Release & Repository Info")
-createCreditCard("Quantify Pro Hub (Apex V21.0)", "Complete Dual-Layer Voter Suite", Colors.Accent)
+createCreditCard("Quantify Pro Hub (Apex V22.0)", "Complete Cheapest-First Auto Builder Suite", Colors.Accent)
 createCreditCard("Developer", "Created by OL3N for Quantify", Colors.AccentGold)
 createCreditCard("GitHub Script URL", "raw.githubusercontent.com/OL3NNNNNN/quantifyyyyy", Colors.AccentCyan)
 createCreditCard("Universal Compatibility", "Works on Medium, Macsploit & UNC Executors", Colors.AccentGreen)
@@ -880,50 +880,77 @@ task.spawn(function()
     end
 end)
 
--- [[ UNIQUE COMPACT STACK BUILDER ENGINE ]] --
+-- [[ CHEAPEST-FIRST AUTO-BUILDER & COMPACT STACK ENGINE ]] --
 local lastBuildAttempt = 0
 local stackHeightOffset = 3.0
 
-local function autoBuildUniqueStack()
+local function autoBuildCheapestFirst()
     if not Config.AutoBuildStack or not humanoidRootPart then return end
     local now = tick()
-    if now - lastBuildAttempt < 2.0 then return end
+    if now - lastBuildAttempt < 1.5 then return end
     lastBuildAttempt = now
 
     local placeRemote = getRemote("PlaceBuilding") or getRemote("Place") or getRemote("Build") or getRemote("PlaceItem")
-    local shopUI = playerGui:FindFirstChild("GameHUD") or playerGui:FindFirstChild("HUD")
-    
-    if shopUI then
-        for _, obj in ipairs(shopUI:GetDescendants()) do
-            if obj:IsA("TextButton") or obj:IsA("ImageButton") then
-                local itemName = obj.Name
-                local pName = obj.Parent and obj.Parent.Name or ""
-                local labelText = ""
-                for _, lbl in ipairs(obj:GetDescendants()) do
-                    if lbl:IsA("TextLabel") and lbl.Visible then labelText = labelText .. " " .. lbl.Text end
-                end
+    local candidates = {}
 
-                if (itemName:find("Upgrader") or labelText:find("Upgrader") or pName:find("Upgrader")) and not placedUpgradersRegistry[itemName] then
-                    placedUpgradersRegistry[itemName] = true
-                    triggerButton(obj)
-                    
-                    local targetCFrame = CFrame.new(humanoidRootPart.Position + Vector3.new(0, stackHeightOffset, 0))
-                    stackHeightOffset = stackHeightOffset + 2.0
-                    
-                    if placeRemote then
-                        task.spawn(function()
-                            pcall(function()
-                                if placeRemote:IsA("RemoteFunction") then
-                                    placeRemote:InvokeServer(itemName, targetCFrame)
-                                else
-                                    placeRemote:FireServer(itemName, targetCFrame)
-                                end
-                            end)
-                        end)
-                    end
-                    break
+    -- Scan for shop buttons with prices
+    for _, gui in ipairs(playerGui:GetDescendants()) do
+        if (gui:IsA("TextButton") or gui:IsA("ImageButton")) and gui.Visible then
+            local itemName = gui.Name
+            local pName = gui.Parent and gui.Parent.Name or ""
+            local fullText = ""
+            
+            for _, lbl in ipairs(gui:GetDescendants()) do
+                if lbl:IsA("TextLabel") and lbl.Visible then
+                    fullText = fullText .. " " .. lbl.Text
                 end
             end
+
+            local isDropper = itemName:lower():find("dropper") or fullText:lower():find("dropper") or pName:lower():find("dropper")
+            local isUpgrader = itemName:lower():find("upgrader") or fullText:lower():find("upgrader") or pName:lower():find("upgrader")
+
+            if (isDropper or isUpgrader) and not placedUpgradersRegistry[itemName] then
+                -- Parse price in text (e.g. "$15", "100 Q", "$1,500")
+                local price = 999999
+                local cleanPrice = fullText:gsub(",", ""):match("%$(%d+)") or fullText:gsub(",", ""):match("(%d+)%s*Q") or fullText:gsub(",", ""):match("(%d+)")
+                if cleanPrice and tonumber(cleanPrice) then
+                    price = tonumber(cleanPrice)
+                end
+
+                table.insert(candidates, {
+                    Button = gui,
+                    Name = itemName,
+                    Price = price,
+                    IsDropper = isDropper
+                })
+            end
+        end
+    end
+
+    -- Sort cheapest first
+    table.sort(candidates, function(a, b)
+        return a.Price < b.Price
+    end)
+
+    -- Purchase and place the cheapest valid machine
+    if #candidates > 0 then
+        local chosen = candidates[1]
+        placedUpgradersRegistry[chosen.Name] = true
+        triggerButton(chosen.Button)
+
+        local targetCFrame = CFrame.new(humanoidRootPart.Position + Vector3.new(0, stackHeightOffset, 0))
+        stackHeightOffset = stackHeightOffset + 2.0
+
+        if placeRemote then
+            task.spawn(function()
+                pcall(function()
+                    if placeRemote:IsA("RemoteFunction") then
+                        placeRemote:InvokeServer(chosen.Name, targetCFrame)
+                    else
+                        placeRemote:FireServer(chosen.Name, targetCFrame)
+                    end
+                end)
+            end)
         end
     end
 end
@@ -1223,7 +1250,7 @@ task.spawn(function()
         autoPickBestCard()
         autoRetry()
         autoClaimQuests()
-        autoBuildUniqueStack()
+        autoBuildCheapestFirst()
     end
 end)
 
